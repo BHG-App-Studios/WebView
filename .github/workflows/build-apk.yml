@@ -28,127 +28,63 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Patch AppConfig.kt, app name and package name
+      # The four tools/ scripts are the single source of truth for how a build
+      # is customised. Each one validates its own input, writes, then re-reads
+      # the file to prove the change landed - and exits non-zero if it did not.
+      # `set -e` (the runner's default) turns any of those into a failed job.
+      - name: Customise the Android project
         env:
-          BUILD_ID: ${{ github.event.client_payload.build_id }}
-          WEBVIEW_URL: ${{ github.event.client_payload.webview_url }}
-          APP_NAME: ${{ github.event.client_payload.app_name }}
           PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
-          CONSTANTS_JSON: ${{ toJson(github.event.client_payload.constants) }}
+          APP_NAME: ${{ github.event.client_payload.app_name }}
+          REMOVE_PERMISSIONS: ${{ join(github.event.client_payload.remove_permissions, ' ') }}
+          PAYLOAD_JSON: ${{ toJson(github.event.client_payload) }}
         run: |
-          cat << 'EOF' > patch.py
-          import json, os, re, sys
-          from xml.sax.saxutils import escape
+          printf '%s' "$PAYLOAD_JSON" > payload.json
+          echo "Dispatch payload:"
+          cat payload.json
+          echo
 
-          CONFIG_PATH  = "Splash_WebView/app/src/main/java/com/BHG/webview/AppConfig.kt"
-          GRADLE_PATH  = "Splash_WebView/app/build.gradle"
-          STRINGS_PATH = "Splash_WebView/app/src/main/res/values/strings.xml"
+          cd Splash_WebView
 
-          print(f"build_id: {os.getenv('BUILD_ID', '')}")
-          total = 0
+          # 1. package name - moves the source trees and rewrites namespace,
+          #    applicationId, package declarations, imports and qualified names
+          if [ -n "$PACKAGE_NAME" ]; then
+            echo "=== rename-package.js $PACKAGE_NAME ==="
+            node ../tools/rename-package.js "$PACKAGE_NAME" --project .
+            echo
+          fi
 
-          def patch(path, pattern, replacement, label):
-              """Apply one substitution. Aborts the build if the pattern is absent."""
-              global total
-              with open(path, "r", encoding="utf-8") as f:
-                  content = f.read()
-              updated, count = re.subn(pattern, replacement, content)
-              if count == 0:
-                  sys.exit(f"FATAL: {label} not found in {path} - refusing to ship an unpatched APK")
-              with open(path, "w", encoding="utf-8") as f:
-                  f.write(updated)
-              total += count
-              print(f"  patched {label} ({count})")
+          # 2. AppConfig.kt values, including webview_url -> HOME_URL
+          echo "=== set-app-config.js ==="
+          node ../tools/set-app-config.js --json ../payload.json --project .
+          echo
 
-          # --- target website -------------------------------------------------
-          url = os.getenv("WEBVIEW_URL", "").strip()
-          if not url:
-              sys.exit("FATAL: webview_url is empty in the dispatch payload")
-          patch(CONFIG_PATH,
-                r'(const\s+val\s+HOME_URL\s*(?::\s*[\w.<>]+)?\s*=\s*)"[^"]*"',
-                lambda m: f'{m.group(1)}"{url}"',
-                "HOME_URL")
+          # 3. launcher label
+          if [ -n "$APP_NAME" ]; then
+            echo "=== set-app-name.js ==="
+            node ../tools/set-app-name.js "$APP_NAME"
+            echo
+          fi
 
-          # --- every other AppConfig.kt constant, driven by the payload --------
-          try:
-              constants = json.loads(os.getenv("CONSTANTS_JSON") or "[]")
-          except json.JSONDecodeError as err:
-              sys.exit(f"FATAL: constants payload is not valid JSON: {err}")
-          if constants is None:
-              constants = []
-          if not isinstance(constants, list):
-              sys.exit("FATAL: constants payload must be a JSON array")
-
-          def const_pattern(name):
-              """Matches `const val NAME: Type = <literal>` with any type annotation."""
-              return rf'(const\s+val\s+{name}\s*(?::\s*[\w.<>]+)?\s*=\s*)'
-
-          for item in constants:
-              name, kind, value = item["name"], item["type"], item["value"]
-
-              if not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
-                  sys.exit(f"FATAL: refusing to patch suspicious constant name '{name}'")
-
-              if kind == "Boolean":
-                  if not isinstance(value, bool):
-                      sys.exit(f"FATAL: {name} expects a boolean, got {value!r}")
-                  pattern = const_pattern(name) + r'(true|false)'
-                  literal = "true" if value else "false"
-
-              elif kind in ("Int", "Long"):
-                  if isinstance(value, bool) or not isinstance(value, int):
-                      sys.exit(f"FATAL: {name} expects a whole number, got {value!r}")
-                  pattern = const_pattern(name) + r'-?\d+L?'
-                  literal = str(value)
-
-              elif kind == "String":
-                  if not isinstance(value, str):
-                      sys.exit(f"FATAL: {name} expects a string, got {value!r}")
-                  escaped = value.replace("\\", "\\\\").replace('"', '\\"')
-                  pattern = const_pattern(name) + r'"[^"]*"'
-                  literal = f'"{escaped}"'
-
-              else:
-                  sys.exit(f"FATAL: unknown constant type '{kind}' for {name}")
-
-              patch(CONFIG_PATH, pattern, lambda m, lit=literal: m.group(1) + lit, name)
-
-          # --- app display name -----------------------------------------------
-          name = os.getenv("APP_NAME", "").strip()
-          if name:
-              name = re.sub(r"[\x00-\x1f\x7f]", " ", name).strip()[:50]
-              # Android string resources: escape backslash, apostrophe and quote
-              name = name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
-              if name[:1] in ("@", "?"):
-                  name = "\\" + name
-              # XML text content
-              name = escape(name)
-              patch(STRINGS_PATH,
-                    r'(<string name="app_name">).*?(</string>)',
-                    lambda m: f"{m.group(1)}{name}{m.group(2)}",
-                    "app_name")
-
-          # --- application id -------------------------------------------------
-          # Only applicationId changes; the namespace (and therefore the R class
-          # and the source tree under com/BHG/webview) stays put.
-          pkg = os.getenv("PACKAGE_NAME", "").strip()
-          if pkg:
-              if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", pkg):
-                  sys.exit(f"FATAL: '{pkg}' is not a valid Android package name")
-              patch(GRADLE_PATH,
-                    r'(applicationId\s+)"[^"]*"',
-                    lambda m: f'{m.group(1)}"{pkg}"',
-                    "applicationId")
-
-          print(f"patch complete: {total} replacement(s)")
-          EOF
-          python3 patch.py
+          # 4. permissions to strip. With no names the script only lists them,
+          #    so it is skipped rather than called with an empty argument list.
+          if [ -n "$REMOVE_PERMISSIONS" ]; then
+            echo "=== set-manifest-permissions.js $REMOVE_PERMISSIONS ==="
+            node ../tools/set-manifest-permissions.js $REMOVE_PERMISSIONS
+            echo
+          else
+            echo "=== no permissions requested for removal ==="
+          fi
 
       - name: Show effective configuration
+        working-directory: ./Splash_WebView
         run: |
-          grep -n "const val" Splash_WebView/app/src/main/java/com/BHG/webview/AppConfig.kt
-          grep -n "app_name" Splash_WebView/app/src/main/res/values/strings.xml
-          grep -n "applicationId\|namespace" Splash_WebView/app/build.gradle
+          node ../tools/set-app-config.js --list --project .
+          echo
+          node ../tools/set-manifest-permissions.js
+          echo
+          grep -n "namespace\|applicationId" app/build.gradle
+          grep -n "app_name" app/src/main/res/values/strings.xml
 
       - name: Build Debug APK
         working-directory: ./Splash_WebView

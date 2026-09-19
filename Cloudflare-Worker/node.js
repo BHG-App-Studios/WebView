@@ -62,6 +62,12 @@ export default {
           return jsonResponse({ error: resolved.error }, 400, corsHeaders);
         }
 
+        // Customisation: permissions to strip from the manifest
+        const removal = normalizePermissions(body.remove_permissions);
+        if (removal.error) {
+          return jsonResponse({ error: removal.error }, 400, corsHeaders);
+        }
+
         const constants = Object.entries(resolved.options).map(([key, value]) => ({
           name: OPTION_SCHEMA[key].name,
           type: OPTION_SCHEMA[key].type,
@@ -77,6 +83,7 @@ export default {
           APP_NAME: appName,
           PACKAGE_NAME: packageName,
           CONSTANTS: constants,
+          REMOVE_PERMISSIONS: removal.permissions,
           UPLOAD_WEBHOOK_URL: uploadWebhookUrl
         };
 
@@ -100,6 +107,7 @@ export default {
           status: ghDispatched ? "BUILDING" : "PENDING_GITHUB_SETUP",
           app_name: appName,
           package_name: packageName,
+          remove_permissions: removal.permissions,
           download_url: downloadUrl,
           status_url: `${url.origin}/api/status/${buildId}`,
           message: ghMessage,
@@ -113,9 +121,11 @@ export default {
       // ----------------------------------------------------
       if (method === "PUT" && path.startsWith("/api/upload/")) {
         const authKey = request.headers.get("X-Build-Secret") || url.searchParams.get("secret");
-        const expectedSecret = env.BUILD_SECRET || "bhg_apk_secret_key";
 
-        if (authKey !== expectedSecret) {
+        // No fallback secret. A default here would be a published password: this
+        // worker's source is readable, so an unset BUILD_SECRET must reject every
+        // upload rather than accept a known string.
+        if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
           return jsonResponse({ error: "Unauthorized upload" }, 401, corsHeaders);
         }
 
@@ -326,6 +336,70 @@ function normalizeAppName(raw, hostname) {
 }
 
 // --------------------------------------------------------
+// Permissions to strip from AndroidManifest.xml
+// --------------------------------------------------------
+
+/**
+ * Permissions the app cannot work without, so they are never removed.
+ *
+ * INTERNET           - a WebView with no INTERNET permission cannot load a page.
+ * ACCESS_NETWORK_STATE - MainActivity calls ConnectivityManager.getNetworkCapabilities()
+ *                        to decide whether to show the offline page; without the
+ *                        permission that call throws SecurityException.
+ */
+const PROTECTED_PERMISSIONS = new Set(["INTERNET", "ACCESS_NETWORK_STATE"]);
+
+/**
+ * Normalises the permission names to strip from AndroidManifest.xml.
+ *
+ * These names are what gets REMOVED, not what is kept. "CAMERA" means the
+ * built APK will not ask for the camera.
+ *
+ * Validation here is structural. tools/set-manifest-permissions.js owns the
+ * vocabulary of keywords (CAMERA, LOCATION, STORAGE, ...) and rejects anything
+ * it does not recognise, which fails the build before an APK is produced - so
+ * a typo costs a build, not a broken app.
+ *
+ * @returns {{permissions: string[]}|{error: string}}
+ */
+function normalizePermissions(raw) {
+  if (raw === undefined || raw === null || raw === "") return { permissions: [] };
+
+  let list;
+  if (Array.isArray(raw)) list = raw;
+  else if (typeof raw === "string") list = raw.split(/[\s,]+/);
+  else return { error: "'remove_permissions' must be an array of names, or a space-separated string" };
+
+  if (list.length > 40) return { error: "'remove_permissions' accepts at most 40 names" };
+
+  const permissions = [];
+
+  for (const entry of list) {
+    if (typeof entry !== "string") return { error: "'remove_permissions' entries must be strings" };
+
+    const name = entry.trim().toUpperCase();
+    if (!name) continue;
+
+    // CAMERA, ACCESS_FINE_LOCATION, com.android.vending.BILLING
+    if (!/^[A-Z][A-Z0-9_]*(?:\.[A-Za-z0-9_]+)*$/.test(name)) {
+      return { error: `Invalid permission name '${entry}'` };
+    }
+    if (name.length > 120) return { error: `Permission name too long: '${entry}'` };
+
+    // Strip a fully-qualified prefix before the guard, or android.permission.INTERNET
+    // would walk straight past it.
+    const bare = name.replace(/^ANDROID\.PERMISSION\./, "");
+    if (PROTECTED_PERMISSIONS.has(bare)) {
+      return { error: `'${bare}' cannot be removed - a WebView app does not work without it` };
+    }
+
+    if (!permissions.includes(bare)) permissions.push(bare);
+  }
+
+  return { permissions };
+}
+
+// --------------------------------------------------------
 // Build options -> AppConfig.kt constants
 // --------------------------------------------------------
 
@@ -449,6 +523,7 @@ async function triggerGitHubAction(env, buildConfig) {
         app_name: buildConfig.APP_NAME,
         package_name: buildConfig.PACKAGE_NAME,
         constants: buildConfig.CONSTANTS,
+        remove_permissions: buildConfig.REMOVE_PERMISSIONS,
         upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL
       }
     })

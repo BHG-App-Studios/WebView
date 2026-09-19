@@ -79,7 +79,7 @@ jobs:
         working-directory: ./Splash_WebView
         run: |
           chmod +x gradlew
-          ./gradlew assembleRelease --no-daemon
+          ./gradlew assembleDebug --no-daemon
 
       - name: Upload APK to Cloudflare Worker
         env:

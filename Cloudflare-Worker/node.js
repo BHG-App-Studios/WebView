@@ -419,17 +419,19 @@ function resolveOptions(body) {
 // GitHub Actions Workflow Trigger
 // --------------------------------------------------------
 async function triggerGitHubAction(env, buildConfig) {
-  const owner = env.GITHUB_OWNER || "BHG-App-Studios"; 
-  const repo = env.GITHUB_REPO || "WebView"; 
-  const ref = env.GITHUB_BRANCH || "server"; // Triggers the run on your 'server' branch
-  const workflowId = env.GITHUB_WORKFLOW_ID || "build-apk.yml";
+  const owner = env.GITHUB_OWNER || "BHG-App-Studios";
+  const repo = env.GITHUB_REPO || "WebView";
+  const eventType = env.GITHUB_EVENT_TYPE || "build-apk";
   const token = env.GITHUB_TOKEN; // GitHub Personal Access Token
 
   if (!token) {
     throw new Error("GITHUB_TOKEN is missing in Cloudflare environment variables.");
   }
 
-  const url = `https://api.github.com/repos/${owner}/${repo}/actions/workflows/${workflowId}/dispatches`;
+  // repository_dispatch rather than workflow_dispatch: the payload is free-form,
+  // so there are no declared workflow inputs and no manual "Run workflow" form.
+  // The workflow file must live on the repository's default branch.
+  const url = `https://api.github.com/repos/${owner}/${repo}/dispatches`;
 
   const response = await fetch(url, {
     method: "POST",
@@ -440,16 +442,14 @@ async function triggerGitHubAction(env, buildConfig) {
       "X-GitHub-Api-Version": "2022-11-28"
     },
     body: JSON.stringify({
-      ref: ref, 
-      inputs: {
+      event_type: eventType,
+      client_payload: {
         build_id: buildConfig.BUILD_ID,
         webview_url: buildConfig.WEBVIEW_URL,
-        upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL,
-        config_json: JSON.stringify({
-          app_name: buildConfig.APP_NAME,
-          package_name: buildConfig.PACKAGE_NAME,
-          constants: buildConfig.CONSTANTS
-        })
+        app_name: buildConfig.APP_NAME,
+        package_name: buildConfig.PACKAGE_NAME,
+        constants: buildConfig.CONSTANTS,
+        upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL
       }
     })
   });

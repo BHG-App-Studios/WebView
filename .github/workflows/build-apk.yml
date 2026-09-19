@@ -1,25 +1,15 @@
 name: Build Android APK
 
+# Triggered only via the Cloudflare Worker, which POSTs to the GitHub
+# repository_dispatch API. There is deliberately no workflow_dispatch trigger:
+# that would add a "Run workflow" form with declared inputs, and the build
+# parameters are free-form JSON instead.
+#
+# NOTE: repository_dispatch only fires if this file is on the repository's
+# default branch (currently `server`).
 on:
-  workflow_dispatch:
-    inputs:
-      build_id:
-        description: 'Unique Build ID'
-        required: true
-        type: string
-      webview_url:
-        description: 'Target Website URL'
-        required: true
-        type: string
-      config_json:
-        description: 'JSON: {"app_name": "...", "package_name": "...", "constants": [{"name","type","value"}]}'
-        required: true
-        type: string
-        default: '{"app_name":"","package_name":"","constants":[]}'
-      upload_webhook_url:
-        description: 'Cloudflare Worker Upload URL'
-        required: true
-        type: string
+  repository_dispatch:
+    types: [build-apk]
 
 permissions:
   contents: read
@@ -40,8 +30,11 @@ jobs:
 
       - name: Patch AppConfig.kt, app name and package name
         env:
-          WEBVIEW_URL: ${{ inputs.webview_url }}
-          CONFIG_JSON: ${{ inputs.config_json }}
+          BUILD_ID: ${{ github.event.client_payload.build_id }}
+          WEBVIEW_URL: ${{ github.event.client_payload.webview_url }}
+          APP_NAME: ${{ github.event.client_payload.app_name }}
+          PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
+          CONSTANTS_JSON: ${{ toJson(github.event.client_payload.constants) }}
         run: |
           cat << 'EOF' > patch.py
           import json, os, re, sys
@@ -51,6 +44,7 @@ jobs:
           GRADLE_PATH  = "Splash_WebView/app/build.gradle"
           STRINGS_PATH = "Splash_WebView/app/src/main/res/values/strings.xml"
 
+          print(f"build_id: {os.getenv('BUILD_ID', '')}")
           total = 0
 
           def patch(path, pattern, replacement, label):
@@ -69,25 +63,27 @@ jobs:
           # --- target website -------------------------------------------------
           url = os.getenv("WEBVIEW_URL", "").strip()
           if not url:
-              sys.exit("FATAL: webview_url is empty")
+              sys.exit("FATAL: webview_url is empty in the dispatch payload")
           patch(CONFIG_PATH,
                 r'(const\s+val\s+HOME_URL\s*(?::\s*[\w.<>]+)?\s*=\s*)"[^"]*"',
                 lambda m: f'{m.group(1)}"{url}"',
                 "HOME_URL")
 
-          # --- everything else, driven by config_json --------------------------
+          # --- every other AppConfig.kt constant, driven by the payload --------
           try:
-              cfg = json.loads(os.getenv("CONFIG_JSON") or "{}")
+              constants = json.loads(os.getenv("CONSTANTS_JSON") or "[]")
           except json.JSONDecodeError as err:
-              sys.exit(f"FATAL: config_json is not valid JSON: {err}")
-          if not isinstance(cfg, dict):
-              sys.exit("FATAL: config_json must be a JSON object")
+              sys.exit(f"FATAL: constants payload is not valid JSON: {err}")
+          if constants is None:
+              constants = []
+          if not isinstance(constants, list):
+              sys.exit("FATAL: constants payload must be a JSON array")
 
           def const_pattern(name):
               """Matches `const val NAME: Type = <literal>` with any type annotation."""
               return rf'(const\s+val\s+{name}\s*(?::\s*[\w.<>]+)?\s*=\s*)'
 
-          for item in cfg.get("constants", []):
+          for item in constants:
               name, kind, value = item["name"], item["type"], item["value"]
 
               if not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
@@ -118,7 +114,7 @@ jobs:
               patch(CONFIG_PATH, pattern, lambda m, lit=literal: m.group(1) + lit, name)
 
           # --- app display name -----------------------------------------------
-          name = str(cfg.get("app_name", "")).strip()
+          name = os.getenv("APP_NAME", "").strip()
           if name:
               name = re.sub(r"[\x00-\x1f\x7f]", " ", name).strip()[:50]
               # Android string resources: escape backslash, apostrophe and quote
@@ -135,7 +131,7 @@ jobs:
           # --- application id -------------------------------------------------
           # Only applicationId changes; the namespace (and therefore the R class
           # and the source tree under com/BHG/webview) stays put.
-          pkg = str(cfg.get("package_name", "")).strip()
+          pkg = os.getenv("PACKAGE_NAME", "").strip()
           if pkg:
               if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", pkg):
                   sys.exit(f"FATAL: '{pkg}' is not a valid Android package name")
@@ -162,9 +158,14 @@ jobs:
 
       - name: Upload APK to Cloudflare Worker
         env:
-          UPLOAD_WEBHOOK: ${{ inputs.upload_webhook_url }}
+          UPLOAD_WEBHOOK: ${{ github.event.client_payload.upload_webhook_url }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
+          if [ -z "$UPLOAD_WEBHOOK" ]; then
+            echo "::error::upload_webhook_url missing from the dispatch payload"
+            exit 1
+          fi
+
           APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
           if [ -z "$APK_PATH" ]; then
             echo "::error::No APK produced by the build"

@@ -11,22 +11,18 @@ on:
         description: 'Target Website URL'
         required: true
         type: string
-      enable_splash:
-        description: 'Enable Splash Screen'
+      config_json:
+        description: 'JSON: {"app_name": "...", "package_name": "...", "constants": [{"name","type","value"}]}'
         required: true
         type: string
-      enable_pull_refresh:
-        description: 'Enable Pull to Refresh'
-        required: true
-        type: string
-      enable_zoom:
-        description: 'Enable Zoom Controls'
-        required: true
-        type: string
+        default: '{"app_name":"","package_name":"","constants":[]}'
       upload_webhook_url:
         description: 'Cloudflare Worker Upload URL'
         required: true
         type: string
+
+permissions:
+  contents: read
 
 jobs:
   build:
@@ -42,40 +38,123 @@ jobs:
           distribution: 'temurin'
           cache: gradle
 
-      - name: Patch AppConfig.kt
+      - name: Patch AppConfig.kt, app name and package name
         env:
           WEBVIEW_URL: ${{ inputs.webview_url }}
-          ENABLE_SPLASH: ${{ inputs.enable_splash }}
-          ENABLE_PULL_REFRESH: ${{ inputs.enable_pull_refresh }}
-          ENABLE_ZOOM: ${{ inputs.enable_zoom }}
+          CONFIG_JSON: ${{ inputs.config_json }}
         run: |
           cat << 'EOF' > patch.py
-          import os, re, sys
-          CONFIG_PATH = "Splash_WebView/app/src/main/java/com/BHG/webview/AppConfig.kt"
-          
-          with open(CONFIG_PATH, "r", encoding="utf-8") as f: content = f.read()
-          
-          def replace_val(code, key, val, is_bool=False):
-              pattern = rf'(const\s+val\s+{key}\s*=\s*)(true|false)' if is_bool else rf'(const\s+val\s+{key}\s*=\s*)".*?"'
-              replacement = rf'\g<1>{val.lower()}' if is_bool else rf'\g<1>"{val}"'
-              return re.sub(pattern, replacement, code)
-              
-          replacements = {
-              "WEBVIEW_URL": ("BASE_URL", False),
-              "ENABLE_SPLASH": ("ENABLE_SPLASH", True),
-              "ENABLE_PULL_REFRESH": ("ENABLE_PULL_TO_REFRESH", True),
-              "ENABLE_ZOOM": ("ENABLE_ZOOM_CONTROLS", True),
-          }
-          
-          for env_var, (const_name, is_bool) in replacements.items():
-              env_val = os.getenv(env_var)
-              if env_val: content = replace_val(content, const_name, env_val, is_bool)
-              
-          with open(CONFIG_PATH, "w", encoding="utf-8") as f: f.write(content)
+          import json, os, re, sys
+          from xml.sax.saxutils import escape
+
+          CONFIG_PATH  = "Splash_WebView/app/src/main/java/com/BHG/webview/AppConfig.kt"
+          GRADLE_PATH  = "Splash_WebView/app/build.gradle"
+          STRINGS_PATH = "Splash_WebView/app/src/main/res/values/strings.xml"
+
+          total = 0
+
+          def patch(path, pattern, replacement, label):
+              """Apply one substitution. Aborts the build if the pattern is absent."""
+              global total
+              with open(path, "r", encoding="utf-8") as f:
+                  content = f.read()
+              updated, count = re.subn(pattern, replacement, content)
+              if count == 0:
+                  sys.exit(f"FATAL: {label} not found in {path} - refusing to ship an unpatched APK")
+              with open(path, "w", encoding="utf-8") as f:
+                  f.write(updated)
+              total += count
+              print(f"  patched {label} ({count})")
+
+          # --- target website -------------------------------------------------
+          url = os.getenv("WEBVIEW_URL", "").strip()
+          if not url:
+              sys.exit("FATAL: webview_url is empty")
+          patch(CONFIG_PATH,
+                r'(const\s+val\s+HOME_URL\s*(?::\s*[\w.<>]+)?\s*=\s*)"[^"]*"',
+                lambda m: f'{m.group(1)}"{url}"',
+                "HOME_URL")
+
+          # --- everything else, driven by config_json --------------------------
+          try:
+              cfg = json.loads(os.getenv("CONFIG_JSON") or "{}")
+          except json.JSONDecodeError as err:
+              sys.exit(f"FATAL: config_json is not valid JSON: {err}")
+          if not isinstance(cfg, dict):
+              sys.exit("FATAL: config_json must be a JSON object")
+
+          def const_pattern(name):
+              """Matches `const val NAME: Type = <literal>` with any type annotation."""
+              return rf'(const\s+val\s+{name}\s*(?::\s*[\w.<>]+)?\s*=\s*)'
+
+          for item in cfg.get("constants", []):
+              name, kind, value = item["name"], item["type"], item["value"]
+
+              if not re.fullmatch(r"[A-Z][A-Z0-9_]*", name):
+                  sys.exit(f"FATAL: refusing to patch suspicious constant name '{name}'")
+
+              if kind == "Boolean":
+                  if not isinstance(value, bool):
+                      sys.exit(f"FATAL: {name} expects a boolean, got {value!r}")
+                  pattern = const_pattern(name) + r'(true|false)'
+                  literal = "true" if value else "false"
+
+              elif kind in ("Int", "Long"):
+                  if isinstance(value, bool) or not isinstance(value, int):
+                      sys.exit(f"FATAL: {name} expects a whole number, got {value!r}")
+                  pattern = const_pattern(name) + r'-?\d+L?'
+                  literal = str(value)
+
+              elif kind == "String":
+                  if not isinstance(value, str):
+                      sys.exit(f"FATAL: {name} expects a string, got {value!r}")
+                  escaped = value.replace("\\", "\\\\").replace('"', '\\"')
+                  pattern = const_pattern(name) + r'"[^"]*"'
+                  literal = f'"{escaped}"'
+
+              else:
+                  sys.exit(f"FATAL: unknown constant type '{kind}' for {name}")
+
+              patch(CONFIG_PATH, pattern, lambda m, lit=literal: m.group(1) + lit, name)
+
+          # --- app display name -----------------------------------------------
+          name = str(cfg.get("app_name", "")).strip()
+          if name:
+              name = re.sub(r"[\x00-\x1f\x7f]", " ", name).strip()[:50]
+              # Android string resources: escape backslash, apostrophe and quote
+              name = name.replace("\\", "\\\\").replace("'", "\\'").replace('"', '\\"')
+              if name[:1] in ("@", "?"):
+                  name = "\\" + name
+              # XML text content
+              name = escape(name)
+              patch(STRINGS_PATH,
+                    r'(<string name="app_name">).*?(</string>)',
+                    lambda m: f"{m.group(1)}{name}{m.group(2)}",
+                    "app_name")
+
+          # --- application id -------------------------------------------------
+          # Only applicationId changes; the namespace (and therefore the R class
+          # and the source tree under com/BHG/webview) stays put.
+          pkg = str(cfg.get("package_name", "")).strip()
+          if pkg:
+              if not re.fullmatch(r"[a-z][a-z0-9_]*(\.[a-z][a-z0-9_]*)+", pkg):
+                  sys.exit(f"FATAL: '{pkg}' is not a valid Android package name")
+              patch(GRADLE_PATH,
+                    r'(applicationId\s+)"[^"]*"',
+                    lambda m: f'{m.group(1)}"{pkg}"',
+                    "applicationId")
+
+          print(f"patch complete: {total} replacement(s)")
           EOF
           python3 patch.py
 
-      - name: Build Release APK
+      - name: Show effective configuration
+        run: |
+          grep -n "const val" Splash_WebView/app/src/main/java/com/BHG/webview/AppConfig.kt
+          grep -n "app_name" Splash_WebView/app/src/main/res/values/strings.xml
+          grep -n "applicationId\|namespace" Splash_WebView/app/build.gradle
+
+      - name: Build Debug APK
         working-directory: ./Splash_WebView
         run: |
           chmod +x gradlew
@@ -86,32 +165,23 @@ jobs:
           UPLOAD_WEBHOOK: ${{ inputs.upload_webhook_url }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
-          echo "Target Webhook: $UPLOAD_WEBHOOK"
-          if [ -z "$UPLOAD_WEBHOOK" ]; then
-            echo "Error: Upload URL is empty. If triggering manually on GitHub, you must paste your Worker /api/upload/ URL."
-            exit 1
-          fi
-          
           APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then 
-            echo "Error: No APK found!"
+          if [ -z "$APK_PATH" ]; then
+            echo "::error::No APK produced by the build"
             exit 1
           fi
-          echo "Found APK at: $APK_PATH"
-          
-          # Perform upload and capture HTTP status
-          HTTP_STATUS=$(curl -s -w "%{http_code}" -X PUT "$UPLOAD_WEBHOOK" \
+          echo "Uploading $APK_PATH ($(stat -c%s "$APK_PATH") bytes)"
+
+          HTTP_CODE=$(curl -s -o /tmp/upload_response.txt -w "%{http_code}" \
+            -X PUT "$UPLOAD_WEBHOOK" \
             -H "X-Build-Secret: $BUILD_SECRET" \
             -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @"$APK_PATH" \
-            -o upload_response.json)
-            
-          echo "HTTP Status: $HTTP_STATUS"
-          cat upload_response.json || true
-          
-          if [ "$HTTP_STATUS" != "200" ]; then
-            echo "Error: Upload failed with status $HTTP_STATUS"
+            --data-binary @"$APK_PATH")
+
+          echo "Worker responded $HTTP_CODE"
+          cat /tmp/upload_response.txt
+
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "::error::APK upload failed with HTTP $HTTP_CODE"
             exit 1
           fi
-          
-          echo "Upload successful!"

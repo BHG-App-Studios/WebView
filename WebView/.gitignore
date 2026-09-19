@@ -1,0 +1,38 @@
+*.iml
+.gradle
+/local.properties
+/.idea/caches
+/.idea/libraries
+/.idea/modules.xml
+/.idea/workspace.xml
+/.idea/navEditor.xml
+/.idea/assetWizardSettings.xml
+.DS_Store
+/build
+/captures
+.externalNativeBuild
+.cxx
+local.properties
+/app/release
+/paths_Old.zip
+
+# Signing keys
+*.jks
+*.keystore
+
+# Environment variables
+.env
+.env.*
+!.env.example
+
+# Secret config files
+secrets.properties
+keys.properties
+credentials.properties
+
+# Firebase Admin SDK (server-side only)
+firebase-adminsdk*.json
+service-account*.json
+
+# Logs
+*.log

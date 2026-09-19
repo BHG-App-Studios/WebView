@@ -86,10 +86,32 @@ jobs:
           UPLOAD_WEBHOOK: ${{ inputs.upload_webhook_url }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
-          APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then exit 1; fi
+          echo "Target Webhook: $UPLOAD_WEBHOOK"
+          if [ -z "$UPLOAD_WEBHOOK" ]; then
+            echo "Error: Upload URL is empty. If triggering manually on GitHub, you must paste your Worker /api/upload/ URL."
+            exit 1
+          fi
           
-          curl -s -w "%{http_code}" -X PUT "$UPLOAD_WEBHOOK" \
+          APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then 
+            echo "Error: No APK found!"
+            exit 1
+          fi
+          echo "Found APK at: $APK_PATH"
+          
+          # Perform upload and capture HTTP status
+          HTTP_STATUS=$(curl -s -w "%{http_code}" -X PUT "$UPLOAD_WEBHOOK" \
             -H "X-Build-Secret: $BUILD_SECRET" \
             -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @"$APK_PATH"
+            --data-binary @"$APK_PATH" \
+            -o upload_response.json)
+            
+          echo "HTTP Status: $HTTP_STATUS"
+          cat upload_response.json || true
+          
+          if [ "$HTTP_STATUS" != "200" ]; then
+            echo "Error: Upload failed with status $HTTP_STATUS"
+            exit 1
+          fi
+          
+          echo "Upload successful!"

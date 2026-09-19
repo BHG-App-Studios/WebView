@@ -1,0 +1,95 @@
+name: Build Android APK
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_id:
+        description: 'Unique Build ID'
+        required: true
+        type: string
+      webview_url:
+        description: 'Target Website URL'
+        required: true
+        type: string
+      enable_splash:
+        description: 'Enable Splash Screen'
+        required: true
+        type: string
+      enable_pull_refresh:
+        description: 'Enable Pull to Refresh'
+        required: true
+        type: string
+      enable_zoom:
+        description: 'Enable Zoom Controls'
+        required: true
+        type: string
+      upload_webhook_url:
+        description: 'Cloudflare Worker Upload URL'
+        required: true
+        type: string
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+
+      - name: Set up JDK 21
+        uses: actions/setup-java@v4
+        with:
+          java-version: '21'
+          distribution: 'temurin'
+          cache: gradle
+
+      - name: Patch AppConfig.kt
+        env:
+          WEBVIEW_URL: ${{ inputs.webview_url }}
+          ENABLE_SPLASH: ${{ inputs.enable_splash }}
+          ENABLE_PULL_REFRESH: ${{ inputs.enable_pull_refresh }}
+          ENABLE_ZOOM: ${{ inputs.enable_zoom }}
+        run: |
+          cat << 'EOF' > patch.py
+          import os, re, sys
+          CONFIG_PATH = "Splash_WebView/app/src/main/java/com/BHG/webview/AppConfig.kt"
+          
+          with open(CONFIG_PATH, "r", encoding="utf-8") as f: content = f.read()
+          
+          def replace_val(code, key, val, is_bool=False):
+              pattern = rf'(const\s+val\s+{key}\s*=\s*)(true|false)' if is_bool else rf'(const\s+val\s+{key}\s*=\s*)".*?"'
+              replacement = rf'\g<1>{val.lower()}' if is_bool else rf'\g<1>"{val}"'
+              return re.sub(pattern, replacement, code)
+              
+          replacements = {
+              "WEBVIEW_URL": ("BASE_URL", False),
+              "ENABLE_SPLASH": ("ENABLE_SPLASH", True),
+              "ENABLE_PULL_REFRESH": ("ENABLE_PULL_TO_REFRESH", True),
+              "ENABLE_ZOOM": ("ENABLE_ZOOM_CONTROLS", True),
+          }
+          
+          for env_var, (const_name, is_bool) in replacements.items():
+              env_val = os.getenv(env_var)
+              if env_val: content = replace_val(content, const_name, env_val, is_bool)
+              
+          with open(CONFIG_PATH, "w", encoding="utf-8") as f: f.write(content)
+          EOF
+          python3 patch.py
+
+      - name: Build Release APK
+        working-directory: ./Splash_WebView
+        run: |
+          chmod +x gradlew
+          ./gradlew assembleRelease --no-daemon
+
+      - name: Upload APK to Cloudflare Worker
+        env:
+          UPLOAD_WEBHOOK: ${{ inputs.upload_webhook_url }}
+          BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
+        run: |
+          APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
+          if [ -z "$APK_PATH" ]; then exit 1; fi
+          
+          curl -s -w "%{http_code}" -X PUT "$UPLOAD_WEBHOOK" \
+            -H "X-Build-Secret: $BUILD_SECRET" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$APK_PATH"

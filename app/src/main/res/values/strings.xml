@@ -9,4 +9,5 @@
     <string name="sign_in_failed">Sign-in failed. Please try again.</string>
     <string name="sign_in_no_network">No internet connection. Please check your network and try again.</string>
     <string name="sign_in_cancelled">Sign-in cancelled</string>
+    <string name="sign_in_no_account">No Google account found on this device. Add a Google account and try again.</string>
 </resources>

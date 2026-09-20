@@ -9,7 +9,7 @@ android {
     compileSdk 37
     defaultConfig {
         applicationId "com.BHG.webapp"
-        minSdk 24
+        minSdk 23
         targetSdk 37
         versionCode 1
         versionName "1.0"
@@ -56,10 +56,10 @@ dependencies {
     implementation libs.firebase.crashlytics
     implementation libs.firebase.auth
 
-    // Google Sign-In
-    //noinspection LoginCredentials
-    implementation libs.play.services.auth
-    implementation libs.kotlinx.coroutines.play.services
+    // Google Sign-In (Credential Manager + Sign in with Google)
+    implementation libs.androidx.credentials
+    implementation libs.androidx.credentials.play.services.auth
+    implementation libs.googleid
 
     // Testing
     testImplementation libs.junit

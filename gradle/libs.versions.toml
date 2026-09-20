@@ -5,13 +5,13 @@ crashlyticsPlugin = "3.0.8"
 desugar_jdk_libs = "2.1.5"
 firebaseBom = "34.19.0"
 kotlin = "2.4.20"
-kotlinxCoroutinesPlayServices = "1.11.0"
 coreKtx = "1.19.0"
 coreSplashscreen = "1.2.0"
 
 activity = "1.13.0"
 material = "1.14.0"
-playServicesAuth = "21.6.0"
+credentials = "1.6.0"
+googleid = "1.2.1"
 swiperefreshlayout = "1.2.0"
 
 junit = "4.13.2"
@@ -40,10 +40,11 @@ firebase-messaging = { module = "com.google.firebase:firebase-messaging" }
 firebase-crashlytics = { module = "com.google.firebase:firebase-crashlytics" }
 firebase-auth = { module = "com.google.firebase:firebase-auth" }
 
-# Google Sign-In
-#noinspection LoginCredentials
-play-services-auth = { module = "com.google.android.gms:play-services-auth", version.ref = "playServicesAuth" }
-kotlinx-coroutines-play-services = { module = "org.jetbrains.kotlinx:kotlinx-coroutines-play-services", version.ref = "kotlinxCoroutinesPlayServices" }
+# Credential Manager (modern Sign in with Google)
+androidx-credentials = { module = "androidx.credentials:credentials", version.ref = "credentials" }
+androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
+googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
+
 
 # Core library desugaring
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }

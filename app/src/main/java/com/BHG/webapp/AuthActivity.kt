@@ -5,34 +5,50 @@ import android.content.Intent
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
+import android.os.CancellationSignal
 import android.util.Log
 import android.view.View
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
-import androidx.activity.result.contract.ActivityResultContracts
 import androidx.appcompat.app.AppCompatActivity
+import androidx.core.content.ContextCompat
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.updatePadding
+import androidx.credentials.Credential
+import androidx.credentials.CredentialManager
+import androidx.credentials.CredentialManagerCallback
+import androidx.credentials.CustomCredential
+import androidx.credentials.GetCredentialRequest
+import androidx.credentials.GetCredentialResponse
+import androidx.credentials.exceptions.GetCredentialCancellationException
+import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.NoCredentialException
 import com.BHG.webapp.databinding.ActivityAuthBinding
-import com.google.android.gms.auth.api.signin.GoogleSignIn
-import com.google.android.gms.auth.api.signin.GoogleSignInClient
-import com.google.android.gms.auth.api.signin.GoogleSignInOptions
-import com.google.android.gms.common.api.ApiException
-import com.google.android.gms.common.api.CommonStatusCodes
+import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
+import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
+import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import java.security.MessageDigest
+import java.security.SecureRandom
 
 /**
- * Gates the app behind a single "Sign in with Google" step backed by Firebase Auth.
+ * Gates the app behind a single "Sign in with Google" step.
  *
- * Mirrors the production sign-in flow: legacy Google Sign-In -> ID token -> Firebase credential.
- * Anonymous / skip sign-in is intentionally not supported.
+ * Uses the modern Credential Manager API (androidx.credentials) with [GetSignInWithGoogleOption]
+ * — the successor to the deprecated GoogleSignIn SDK — to obtain a Google ID token, which is then
+ * exchanged for a Firebase credential. Anonymous / skip sign-in is intentionally not supported.
  *
- * Crash-proof: every external result is null-checked and wrapped, the button is debounced against
- * double taps, and every async callback bails out if the activity is finishing/destroyed before it
- * touches a view.
+ * Design notes:
+ *  - Thread-safe: [CredentialManager.getCredentialAsync] runs off the main thread; its callback is
+ *    dispatched back onto the main thread via [ContextCompat.getMainExecutor], and Firebase's
+ *    listener is bound to this activity, so all UI work happens on the main thread only.
+ *  - Crash-proof: every callback bails out if the activity is finishing/destroyed, all parsing is
+ *    wrapped, and the in-flight request is cancelled in onDestroy.
+ *  - Replay-protected: a random nonce is hashed (SHA-256) for the credential request and the raw
+ *    nonce is handed to Firebase for verification.
  */
 class AuthActivity : AppCompatActivity() {
 
@@ -40,20 +56,17 @@ class AuthActivity : AppCompatActivity() {
 
     private var auth: FirebaseAuth? = null
 
-    private var googleSignInClient: GoogleSignInClient? = null
+    private var credentialManager: CredentialManager? = null
 
-    // Guards against double taps launching two sign-in flows at once.
+    // Guards against double taps launching two credential requests at once.
     private var signInInProgress = false
 
-    private val signInLauncher =
-        registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
-            handleSignInResult(result.data)
-        }
+    // Allows an in-flight credential request to be cancelled on teardown.
+    private var cancellationSignal: CancellationSignal? = null
 
     override fun onCreate(savedInstanceState: Bundle?) {
         // Swaps the splash theme for Theme.WebsiteAppBuilder (postSplashScreenTheme) before any
-        // view is inflated, so Material attributes (colorSurface, textAppearance*, button style)
-        // resolve correctly.
+        // view is inflated, so Material attributes resolve correctly.
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
@@ -87,11 +100,12 @@ class AuthActivity : AppCompatActivity() {
             insets
         }
 
-        val gso = GoogleSignInOptions.Builder(GoogleSignInOptions.DEFAULT_SIGN_IN)
-            .requestIdToken(getString(R.string.default_web_client_id))
-            .requestEmail()
-            .build()
-        googleSignInClient = GoogleSignIn.getClient(this, gso)
+        credentialManager = try {
+            CredentialManager.create(this)
+        } catch (e: Exception) {
+            Log.w(TAG, "CredentialManager init failed: ${e.message}")
+            null
+        }
 
         binding.signInButton.setOnClickListener { startSignIn() }
     }
@@ -104,61 +118,90 @@ class AuthActivity : AppCompatActivity() {
             return
         }
 
-        val client = googleSignInClient ?: run {
+        val manager = credentialManager ?: run {
             toast(R.string.sign_in_failed)
             return
         }
 
         setLoading(true)
 
-        // Sign out of the cached Google session first so the account chooser is always shown and a
-        // stale/revoked token is never silently reused.
-        client.signOut().addOnCompleteListener(this) {
-            if (isFinishing || isDestroyed) return@addOnCompleteListener
-            try {
-                signInLauncher.launch(client.signInIntent)
-            } catch (e: Exception) {
-                Log.w(TAG, "Failed to launch sign-in intent: ${e.message}")
-                setLoading(false)
-                toast(R.string.sign_in_failed)
-            }
-        }
-    }
+        val rawNonce = newRawNonce()
+        val hashedNonce = sha256(rawNonce)
 
-    private fun handleSignInResult(data: Intent?) {
-        if (data == null) {
-            setLoading(false)
-            toast(R.string.sign_in_cancelled)
-            return
-        }
+        val option = GetSignInWithGoogleOption
+            .Builder(getString(R.string.default_web_client_id))
+            .setNonce(hashedNonce)
+            .build()
 
-        val task = GoogleSignIn.getSignedInAccountFromIntent(data)
+        val request = GetCredentialRequest.Builder()
+            .addCredentialOption(option)
+            .build()
+
+        val signal = CancellationSignal()
+        cancellationSignal = signal
+
         try {
-            val account = task.getResult(ApiException::class.java)
-            val idToken = account?.idToken
-            if (idToken.isNullOrEmpty()) {
-                setLoading(false)
-                toast(R.string.sign_in_failed)
-                return
-            }
-            firebaseAuthWithGoogle(idToken)
-        } catch (e: ApiException) {
-            setLoading(false)
-            when (e.statusCode) {
-                CommonStatusCodes.CANCELED,
-                CommonStatusCodes.SIGN_IN_REQUIRED -> toast(R.string.sign_in_cancelled)
-                CommonStatusCodes.NETWORK_ERROR -> toast(R.string.sign_in_no_network)
-                else -> toast(R.string.sign_in_failed)
-            }
+            manager.getCredentialAsync(
+                context = this,
+                request = request,
+                cancellationSignal = signal,
+                executor = ContextCompat.getMainExecutor(this),
+                callback = object : CredentialManagerCallback<GetCredentialResponse, GetCredentialException> {
+                    override fun onResult(result: GetCredentialResponse) {
+                        if (isFinishing || isDestroyed) return
+                        handleCredential(result.credential, rawNonce)
+                    }
+
+                    override fun onError(e: GetCredentialException) {
+                        if (isFinishing || isDestroyed) return
+                        setLoading(false)
+                        when (e) {
+                            is GetCredentialCancellationException -> toast(R.string.sign_in_cancelled)
+                            is NoCredentialException -> toast(R.string.sign_in_no_account)
+                            else -> {
+                                Log.w(TAG, "getCredential failed: ${e.javaClass.simpleName}: ${e.message}")
+                                toast(R.string.sign_in_failed)
+                            }
+                        }
+                    }
+                }
+            )
         } catch (e: Exception) {
-            Log.w(TAG, "Unexpected sign-in error: ${e.message}")
+            Log.w(TAG, "Failed to start credential request: ${e.message}")
             setLoading(false)
             toast(R.string.sign_in_failed)
         }
     }
 
-    private fun firebaseAuthWithGoogle(idToken: String) {
-        val credential = GoogleAuthProvider.getCredential(idToken, null)
+    private fun handleCredential(credential: Credential, rawNonce: String) {
+        if (credential is CustomCredential &&
+            credential.type == GoogleIdTokenCredential.TYPE_GOOGLE_ID_TOKEN_CREDENTIAL
+        ) {
+            val idToken = try {
+                GoogleIdTokenCredential.createFrom(credential.data).idToken
+            } catch (e: GoogleIdTokenParsingException) {
+                Log.w(TAG, "Invalid Google ID token: ${e.message}")
+                setLoading(false)
+                toast(R.string.sign_in_failed)
+                return
+            }
+
+            if (idToken.isNullOrEmpty()) {
+                setLoading(false)
+                toast(R.string.sign_in_failed)
+                return
+            }
+
+            firebaseAuthWithGoogle(idToken, rawNonce)
+        } else {
+            Log.w(TAG, "Unexpected credential type: ${credential.type}")
+            setLoading(false)
+            toast(R.string.sign_in_failed)
+        }
+    }
+
+    private fun firebaseAuthWithGoogle(idToken: String, rawNonce: String) {
+        val credential = GoogleAuthProvider.getCredential(idToken, rawNonce)
         val localAuth = auth ?: FirebaseAuth.getInstance()
 
         localAuth.signInWithCredential(credential).addOnCompleteListener(this) { task ->
@@ -199,6 +242,24 @@ class AuthActivity : AppCompatActivity() {
         val network = manager.activeNetwork ?: return true
         val capabilities = manager.getNetworkCapabilities(network) ?: return true
         return !capabilities.hasCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+    }
+
+    private fun newRawNonce(): String {
+        val bytes = ByteArray(32)
+        SecureRandom().nextBytes(bytes)
+        return bytes.joinToString("") { "%02x".format(it) }
+    }
+
+    private fun sha256(value: String): String {
+        val digest = MessageDigest.getInstance("SHA-256").digest(value.toByteArray())
+        return digest.joinToString("") { "%02x".format(it) }
+    }
+
+    override fun onDestroy() {
+        // Cancel any in-flight credential request so its callback can't fire post-teardown.
+        cancellationSignal?.cancel()
+        cancellationSignal = null
+        super.onDestroy()
     }
 
     private companion object {

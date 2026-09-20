@@ -77,7 +77,8 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:orientation="vertical"
-            android:paddingHorizontal="14dp"
+            android:paddingStart="14dp"
+            android:paddingEnd="14dp"
             android:paddingBottom="24dp">
 
             <!-- Appearance -->

@@ -13,7 +13,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="@dimen/screen_margin">
+        android:paddingStart="@dimen/screen_margin"
+        android:paddingEnd="@dimen/screen_margin">
 
         <!-- Hero header -->
         <TextView
@@ -126,8 +127,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="4dp" />
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
         </com.google.android.material.card.MaterialCardView>
 
         <!-- Permissions -->
@@ -158,8 +161,10 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:paddingHorizontal="18dp"
-                android:paddingVertical="4dp" />
+                android:paddingStart="18dp"
+                android:paddingEnd="18dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp" />
         </com.google.android.material.card.MaterialCardView>
 
         <!-- Build button -->

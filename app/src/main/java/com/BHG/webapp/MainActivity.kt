@@ -5,7 +5,6 @@ import android.os.Bundle
 import android.util.Log
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
-import androidx.appcompat.app.AppCompatDelegate
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
@@ -137,22 +136,24 @@ class MainActivity : AppCompatActivity() {
             binding.drawerLayout.closeDrawer(GravityCompat.START)
         }
 
-        // Theme toggle reflects the current mode and applies changes immediately.
-        when (AppCompatDelegate.getDefaultNightMode()) {
-            AppCompatDelegate.MODE_NIGHT_NO -> drawer.themeToggle.check(R.id.themeLight)
-            AppCompatDelegate.MODE_NIGHT_YES -> drawer.themeToggle.check(R.id.themeDark)
+        // Theme toggle reflects the saved choice and applies changes immediately.
+        when (ThemePrefs.getMode(this)) {
+            ThemePrefs.LIGHT -> drawer.themeToggle.check(R.id.themeLight)
+            ThemePrefs.DARK -> drawer.themeToggle.check(R.id.themeDark)
             else -> drawer.themeToggle.check(R.id.themeSystem)
         }
         drawer.themeToggle.addOnButtonCheckedListener(
             MaterialButtonToggleGroup.OnButtonCheckedListener { _, checkedId, isChecked ->
                 if (!isChecked) return@OnButtonCheckedListener
                 val mode = when (checkedId) {
-                    R.id.themeLight -> AppCompatDelegate.MODE_NIGHT_NO
-                    R.id.themeDark -> AppCompatDelegate.MODE_NIGHT_YES
-                    else -> AppCompatDelegate.MODE_NIGHT_FOLLOW_SYSTEM
+                    R.id.themeLight -> ThemePrefs.LIGHT
+                    R.id.themeDark -> ThemePrefs.DARK
+                    else -> ThemePrefs.SYSTEM
                 }
-                if (mode != AppCompatDelegate.getDefaultNightMode()) {
-                    AppCompatDelegate.setDefaultNightMode(mode)
+                if (mode != ThemePrefs.getMode(this)) {
+                    // Persist + apply; AppCompat recreates the activity with the
+                    // correct day/night resources.
+                    ThemePrefs.setMode(this, mode)
                 }
             }
         )

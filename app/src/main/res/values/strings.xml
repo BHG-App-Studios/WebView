@@ -12,9 +12,9 @@
     <string name="sign_in_no_account">No Google account found on this device. Add a Google account and try again.</string>
 
     <!-- Bottom navigation -->
-    <string name="nav_home">Home</string>
-    <string name="nav_history">History</string>
-    <string name="nav_profile">Profile</string>
+    <string name="nav_home">Build</string>
+    <string name="nav_history">Apps</string>
+    <string name="nav_profile">Account</string>
 
     <!-- Toolbar titles -->
     <string name="title_home">Build App</string>

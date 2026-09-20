@@ -12,7 +12,8 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:paddingHorizontal="@dimen/screen_margin">
+        android:paddingStart="@dimen/screen_margin"
+        android:paddingEnd="@dimen/screen_margin">
 
         <!-- Profile header card -->
         <com.google.android.material.card.MaterialCardView
@@ -186,8 +187,7 @@
             android:layout_marginTop="18dp"
             android:text="@string/sign_out"
             android:textAllCaps="false"
-            android:fontFamily="@font/roboto"
-            android:textFontWeight="600"
+            android:fontFamily="@font/roboto_semibold"
             app:cornerRadius="@dimen/field_radius"
             app:icon="@drawable/ic_logout"
             app:iconGravity="textStart" />

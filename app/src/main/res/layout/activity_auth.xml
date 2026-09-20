@@ -151,7 +151,7 @@
         style="@style/Widget.MaterialComponents.Button"
         android:layout_width="wrap_content"
         android:layout_height="56dp"
-        android:minWidth="268dp"
+        android:minWidth="248dp"
         android:layout_gravity="center_horizontal"
         android:text="@string/sign_in_with_google"
         android:textColor="@color/google_btn_text"

@@ -12,7 +12,7 @@
     <string name="auth_hero_web">Website</string>
     <string name="auth_hero_app">Android App</string>
     <!-- Terms line with clickable links; %1$s and %2$s are the link labels -->
-    <string name="auth_terms">By continuing, you agree to our %1$s and %2$s.</string>
+    <string name="auth_terms">By continuing, you agree to our %1$s\nand %2$s.</string>
     <string name="auth_terms_privacy">Privacy Policy</string>
     <string name="auth_terms_tos">Terms of Service</string>
     <string name="sign_in_failed">Sign-in failed. Please try again.</string>

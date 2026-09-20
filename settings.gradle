@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Website App Builder"
+rootProject.name = "WebCraft Website Builder"
 include(":app")

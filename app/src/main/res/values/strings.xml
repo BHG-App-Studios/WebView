@@ -11,14 +11,18 @@
     <string name="sign_in_with_google">Continue with Google</string>
     <string name="auth_hero_web">Website</string>
     <string name="auth_hero_app">Android App</string>
-    <!-- Terms line with clickable links; %1$s and %2$s are the link labels -->
     <string name="auth_terms">By continuing, you agree to our %1$s\nand %2$s.</string>
     <string name="auth_terms_privacy">Privacy Policy</string>
     <string name="auth_terms_tos">Terms of Service</string>
-    <string name="sign_in_failed">Sign-in failed. Please try again.</string>
+    <string name="sign_in_failed">Google Sign-in failed. Please try again.</string>
     <string name="sign_in_no_network">No internet connection. Please check your network and try again.</string>
     <string name="sign_in_cancelled">Sign-in cancelled</string>
     <string name="sign_in_no_account">No Google account found on this device. Add a Google account and try again.</string>
+    <string name="sign_in_account_disabled">This account has been disabled. Please contact support.</string>
+    <string name="sign_in_unable">Unable to sign in. Please try again.</string>
+    <string name="sign_in_timeout">Sign-in timed out. Please try again.</string>
+    <string name="sign_in_server">Something went wrong. Please try again later.</string>
+    <string name="sign_in_unknown">Something went wrong. Please try again.</string>
 
     <!-- Bottom navigation -->
     <string name="nav_home">Build</string>

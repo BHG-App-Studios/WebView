@@ -33,12 +33,18 @@ import androidx.credentials.GetCredentialRequest
 import androidx.credentials.GetCredentialResponse
 import androidx.credentials.exceptions.GetCredentialCancellationException
 import androidx.credentials.exceptions.GetCredentialException
+import androidx.credentials.exceptions.GetCredentialInterruptedException
 import androidx.credentials.exceptions.NoCredentialException
 import com.BHG.webapp.databinding.ActivityAuthBinding
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
+import com.google.firebase.FirebaseException
+import com.google.firebase.FirebaseNetworkException
+import com.google.firebase.FirebaseTooManyRequestsException
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.auth.FirebaseAuthException
+import com.google.firebase.auth.FirebaseAuthInvalidUserException
 import com.google.firebase.auth.GoogleAuthProvider
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
@@ -270,14 +276,7 @@ class AuthActivity : AppCompatActivity() {
                     override fun onError(e: GetCredentialException) {
                         if (isFinishing || isDestroyed) return
                         setLoading(false)
-                        when (e) {
-                            is GetCredentialCancellationException -> toast(R.string.sign_in_cancelled)
-                            is NoCredentialException -> toast(R.string.sign_in_no_account)
-                            else -> {
-                                Log.w(TAG, "getCredential failed: ${e.javaClass.simpleName}: ${e.message}")
-                                toast(R.string.sign_in_failed)
-                            }
-                        }
+                        toast(messageForCredentialError(e))
                     }
                 }
             )
@@ -330,9 +329,33 @@ class AuthActivity : AppCompatActivity() {
             } else {
                 Log.w(TAG, "Firebase auth failed: ${task.exception?.message}")
                 setLoading(false)
-                toast(R.string.sign_in_failed)
+                toast(messageForFirebaseError(task.exception))
             }
         }
+    }
+
+    /** Maps a Credential Manager error to the right user-facing message. */
+    private fun messageForCredentialError(e: GetCredentialException): Int = when (e) {
+        is GetCredentialCancellationException -> R.string.sign_in_cancelled
+        is NoCredentialException -> R.string.sign_in_no_account
+        is GetCredentialInterruptedException ->
+            if (isOffline()) R.string.sign_in_no_network else R.string.sign_in_unable
+        else -> {
+            Log.w(TAG, "getCredential failed: ${e.javaClass.simpleName}: ${e.message}")
+            if (isOffline()) R.string.sign_in_no_network else R.string.sign_in_failed
+        }
+    }
+
+    /** Maps a Firebase sign-in failure to the right user-facing message. */
+    private fun messageForFirebaseError(e: Exception?): Int = when {
+        isOffline() -> R.string.sign_in_no_network
+        e is FirebaseNetworkException -> R.string.sign_in_no_network
+        e is FirebaseAuthInvalidUserException &&
+            e.errorCode == "ERROR_USER_DISABLED" -> R.string.sign_in_account_disabled
+        e is FirebaseTooManyRequestsException -> R.string.sign_in_server
+        e is FirebaseAuthException -> R.string.sign_in_unable
+        e is FirebaseException -> R.string.sign_in_server
+        else -> R.string.sign_in_unknown
     }
 
     /**

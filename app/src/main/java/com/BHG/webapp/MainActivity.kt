@@ -206,35 +206,144 @@ class MainActivity : AppCompatActivity() {
             return
         }
 
-        val request = buildRequestJson(url, appName, packageName)
+        val user = auth?.currentUser
+        if (user == null) {
+            startActivity(Intent(this, AuthActivity::class.java))
+            finish()
+            return
+        }
+
+        // The build id is generated here, registered in Firestore, then handed
+        // to the Worker. The Worker re-reads this exact doc with a service
+        // account and rejects the build unless it exists under this uid and is
+        // less than 5 minutes old — so a caller cannot fabricate a request.
+        val buildId = newBuildId()
+        val downloadUrl = "${BuildApi.BASE_URL}/download/$buildId.apk"
+        currentBuildId = buildId
+        currentDownloadUrl = downloadUrl
+
+        val request = buildRequestJson(url, appName, packageName, buildId)
 
         setBuilding(true)
         showStatus(getString(R.string.building), showSpinner = true, showDownload = false)
 
+        registerAndDispatch(user, buildId, url, appName, packageName, downloadUrl, request)
+    }
+
+    /**
+     * Registers the build doc first, then dispatches to the Worker only after
+     * the write is acknowledged by the server — so the doc (with its server
+     * timestamp) is guaranteed to be readable when the Worker checks it.
+     */
+    private fun registerAndDispatch(
+        user: com.google.firebase.auth.FirebaseUser,
+        buildId: String,
+        url: String,
+        appName: String,
+        packageName: String,
+        downloadUrl: String,
+        request: JSONObject
+    ) {
+        val db = firestore
+        if (db == null) {
+            failBuild(getString(R.string.build_failed))
+            return
+        }
+
+        saveProfile(user)
+
+        val record = hashMapOf(
+            "buildId" to buildId,
+            "url" to url,
+            "appName" to appName.ifEmpty { Uri.parse(url).host ?: "" },
+            "packageName" to packageName.ifEmpty { "auto" },
+            "options" to featureOptions.associate { opt ->
+                opt.key to (featureSwitches[opt.key]?.isChecked ?: opt.default)
+            },
+            "removePermissions" to permissionOptions
+                .filter { permissionSwitches[it.key]?.isChecked == false }
+                .flatMap { it.removeKeywords }
+                .distinct(),
+            "downloadUrl" to downloadUrl,
+            "status" to "BUILDING",
+            "sizeBytes" to 0L,
+            "createdAt" to FieldValue.serverTimestamp()
+        )
+
+        db.collection("users").document(user.uid)
+            .collection("builds").document(buildId)
+            .set(record)
+            .addOnSuccessListener {
+                if (isFinishing || isDestroyed || buildId != currentBuildId) return@addOnSuccessListener
+                dispatchBuild(user, buildId, request)
+            }
+            .addOnFailureListener { e ->
+                if (isFinishing || isDestroyed) return@addOnFailureListener
+                Log.w(TAG, "Build register failed: ${e.message}")
+                failBuild(getString(R.string.build_failed))
+            }
+    }
+
+    /** Fetches a fresh ID token, then calls the Worker. */
+    private fun dispatchBuild(
+        user: com.google.firebase.auth.FirebaseUser,
+        buildId: String,
+        request: JSONObject
+    ) {
+        user.getIdToken(false)
+            .addOnSuccessListener { result ->
+                if (isFinishing || isDestroyed || buildId != currentBuildId) return@addOnSuccessListener
+                val token = result.token
+                if (token.isNullOrEmpty()) {
+                    failBuild(getString(R.string.build_failed))
+                    return@addOnSuccessListener
+                }
+                callWorker(buildId, request, token)
+            }
+            .addOnFailureListener { e ->
+                if (isFinishing || isDestroyed) return@addOnFailureListener
+                Log.w(TAG, "ID token fetch failed: ${e.message}")
+                failBuild(getString(R.string.build_failed))
+            }
+    }
+
+    private fun callWorker(buildId: String, request: JSONObject, idToken: String) {
         BuildApi.build(
             request = request,
+            idToken = idToken,
             onSuccess = { result ->
-                if (isFinishing || isDestroyed) return@build
-                currentBuildId = result.buildId
-                currentDownloadUrl = result.downloadUrl
-                saveBuildRecord(result, request)
+                if (isFinishing || isDestroyed || buildId != currentBuildId) return@build
+                currentDownloadUrl = result.downloadUrl.ifEmpty { currentDownloadUrl }
                 showStatus(getString(R.string.build_queued), showSpinner = true, showDownload = false)
-                startPolling(result.buildId)
+                startPolling(buildId)
             },
             onError = { message ->
-                if (isFinishing || isDestroyed) return@build
+                if (isFinishing || isDestroyed || buildId != currentBuildId) return@build
                 Log.w(TAG, "Build dispatch failed: $message")
-                setBuilding(false)
-                showStatus(getString(R.string.build_failed), showSpinner = false, showDownload = false)
-                toast(R.string.build_failed)
+                updateBuildStatus("REJECTED", 0L)
+                failBuild(getString(R.string.build_failed))
             }
         )
     }
 
+    private fun failBuild(message: String) {
+        setBuilding(false)
+        showStatus(message, showSpinner = false, showDownload = false)
+        if (!isFinishing && !isDestroyed) {
+            Toast.makeText(this, message, Toast.LENGTH_SHORT).show()
+        }
+    }
+
     /** Assembles the exact JSON contract the Worker expects. */
-    private fun buildRequestJson(url: String, appName: String, packageName: String): JSONObject {
+    private fun buildRequestJson(
+        url: String,
+        appName: String,
+        packageName: String,
+        buildId: String
+    ): JSONObject {
         val json = JSONObject()
         json.put("url", url)
+        json.put("build_id", buildId)
         if (appName.isNotEmpty()) json.put("app_name", appName)
         if (packageName.isNotEmpty()) json.put("package_name", packageName)
 
@@ -320,17 +429,9 @@ class MainActivity : AppCompatActivity() {
 
     // ---- Firestore -----------------------------------------------------------
 
-    /**
-     * Writes the user profile (merge) and the build record.
-     *
-     * Layout: users/{uid} holds the profile; users/{uid}/builds/{buildId} holds
-     * one document per build with its full configuration.
-     */
-    private fun saveBuildRecord(result: BuildApi.BuildResult, request: JSONObject) {
-        val user = auth?.currentUser ?: return
+    /** Upserts the user profile under users/{uid} (merge, never clobbers builds). */
+    private fun saveProfile(user: com.google.firebase.auth.FirebaseUser) {
         val db = firestore ?: return
-        val userDoc = db.collection("users").document(user.uid)
-
         val profile = mapOf(
             "uid" to user.uid,
             "email" to (user.email ?: ""),
@@ -338,30 +439,9 @@ class MainActivity : AppCompatActivity() {
             "photoUrl" to (user.photoUrl?.toString() ?: ""),
             "lastActiveAt" to FieldValue.serverTimestamp()
         )
-        userDoc.set(profile, SetOptions.merge())
+        db.collection("users").document(user.uid)
+            .set(profile, SetOptions.merge())
             .addOnFailureListener { e -> Log.w(TAG, "Profile save failed: ${e.message}") }
-
-        val record = hashMapOf(
-            "buildId" to result.buildId,
-            "url" to request.optString("url"),
-            "appName" to result.appName,
-            "packageName" to result.packageName,
-            "options" to featureOptions.associate { opt ->
-                opt.key to (featureSwitches[opt.key]?.isChecked ?: opt.default)
-            },
-            "removePermissions" to permissionOptions
-                .filter { permissionSwitches[it.key]?.isChecked == false }
-                .flatMap { it.removeKeywords }
-                .distinct(),
-            "downloadUrl" to result.downloadUrl,
-            "status" to "BUILDING",
-            "sizeBytes" to 0L,
-            "createdAt" to FieldValue.serverTimestamp()
-        )
-
-        userDoc.collection("builds").document(result.buildId)
-            .set(record)
-            .addOnFailureListener { e -> Log.w(TAG, "Build record save failed: ${e.message}") }
     }
 
     private fun updateBuildStatus(status: String, sizeBytes: Long) {
@@ -465,6 +545,13 @@ class MainActivity : AppCompatActivity() {
         } catch (e: Exception) {
             false
         }
+    }
+
+    /** Matches the Worker's expected id shape: app_<millis>_<shortrandom>. */
+    private fun newBuildId(): String {
+        val chars = "abcdefghijklmnopqrstuvwxyz0123456789"
+        val suffix = buildString { repeat(5) { append(chars.random()) } }
+        return "app_${System.currentTimeMillis()}_$suffix"
     }
 
     private fun isOffline(): Boolean {

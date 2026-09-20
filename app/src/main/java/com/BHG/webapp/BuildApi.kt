@@ -46,12 +46,13 @@ object BuildApi {
      */
     fun build(
         request: JSONObject,
+        idToken: String,
         onSuccess: (BuildResult) -> Unit,
         onError: (String) -> Unit
     ) {
         executor.execute {
             try {
-                val (code, text) = post("$BASE_URL/api/build", request.toString())
+                val (code, text) = post("$BASE_URL/api/build", request.toString(), idToken)
                 val json = parse(text)
 
                 if (code in 200..299 && json != null && json.optBoolean("success", false)) {
@@ -109,7 +110,7 @@ object BuildApi {
         mainHandler.post { onError(message) }
     }
 
-    private fun post(urlString: String, body: String): Pair<Int, String> {
+    private fun post(urlString: String, body: String, idToken: String): Pair<Int, String> {
         val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"
             connectTimeout = CONNECT_TIMEOUT_MS
@@ -117,6 +118,7 @@ object BuildApi {
             doOutput = true
             setRequestProperty("Content-Type", "application/json")
             setRequestProperty("Accept", "application/json")
+            setRequestProperty("Authorization", "Bearer $idToken")
         }
         return try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }

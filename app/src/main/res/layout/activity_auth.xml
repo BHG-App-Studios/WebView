@@ -7,9 +7,7 @@
     android:orientation="vertical"
     android:background="?android:attr/colorBackground"
     android:fitsSystemWindows="true"
-    android:gravity="center_horizontal"
-    android:paddingStart="28dp"
-    android:paddingEnd="28dp">
+    android:gravity="center_horizontal">
 
     <Space
         android:layout_width="match_parent"
@@ -55,6 +53,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/auth_hero_web"
+                android:textSize="12sp"
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
@@ -84,8 +83,8 @@
                 android:layout_height="76dp">
 
                 <View
-                    android:layout_width="76dp"
-                    android:layout_height="76dp"
+                    android:layout_width="74dp"
+                    android:layout_height="74dp"
                     android:background="@drawable/bg_logo_tile" />
 
                 <ImageView
@@ -102,6 +101,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="8dp"
                 android:text="@string/auth_hero_app"
+                android:textSize="12sp"
                 android:textAppearance="?attr/textAppearanceBodySmall"
                 android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>
@@ -113,6 +113,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="36dp"
         android:text="@string/auth_title"
+        android:textSize="30sp"
         android:textAppearance="?attr/textAppearanceHeadlineMedium"
         android:textColor="?attr/colorOnSurface"
         android:gravity="center" />
@@ -123,15 +124,19 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:gravity="center"
+        android:layout_marginHorizontal="28dp"
+        android:textSize="15sp"
         android:lineSpacingExtra="4dp"
         android:text="@string/auth_subtitle"
         android:textAppearance="?attr/textAppearanceBodyLarge"
         android:textColor="?attr/colorOnSurfaceVariant" />
 
+
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
         android:layout_weight="1.1" />
+
 
     <ProgressBar
         android:id="@+id/authProgress"
@@ -144,8 +149,10 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/signInButton"
         style="@style/Widget.MaterialComponents.Button"
-        android:layout_width="match_parent"
-        android:layout_height="58dp"
+        android:layout_width="wrap_content"
+        android:layout_height="56dp"
+        android:minWidth="268dp"
+        android:layout_gravity="center_horizontal"
         android:text="@string/sign_in_with_google"
         android:textColor="@color/google_btn_text"
         android:textSize="15sp"
@@ -166,13 +173,18 @@
         app:strokeColor="@color/google_btn_stroke"
         app:strokeWidth="1dp" />
 
+
+
+
     <TextView
         android:id="@+id/termsText"
-        android:layout_width="wrap_content"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
+        android:layout_marginHorizontal="28dp"
         android:layout_marginTop="18dp"
         android:layout_marginBottom="30dp"
         android:gravity="center"
+        android:textSize="11sp"
         android:lineSpacingExtra="3dp"
         android:textAppearance="?attr/textAppearanceBodySmall"
         android:textColor="?attr/colorOnSurfaceVariant"

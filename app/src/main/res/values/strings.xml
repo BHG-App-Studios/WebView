@@ -6,7 +6,8 @@
 
     <!-- Auth -->
     <string name="auth_title">WebCraft</string>
-    <string name="auth_subtitle">Turn any website into a fast, polished Android app — no code, no setup. Pick your features and permissions, tap build, and download a ready-to-install APK in minutes.</string>
+    <string name="auth_subtitle">Turn your website into a professional Android app 🚀 Build APK &amp; AAB in minutes, publish on Google Play, and reach more users — no coding required.
+</string>
     <string name="sign_in_with_google">Continue with Google</string>
     <string name="auth_hero_web">Website</string>
     <string name="auth_hero_app">Android App</string>

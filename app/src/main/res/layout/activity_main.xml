@@ -7,50 +7,68 @@
     android:layout_height="match_parent"
     android:background="@color/home_content_bg">
 
+    <!-- The drawer layout's own background is what paints the status-bar strip. Nothing
+         else covers that strip: the container below is padded clear of it, and every view
+         inside the container is opaque. Group A — same colour as the fragment bg and the
+         64dp top bar. -->
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/mainContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- No toolbar here: each fragment owns its own 64dp top bar, exactly like the
-             reference app. The fragment fills the shell and the bottom bar overlays it. -->
-        <androidx.fragment.app.FragmentContainerView
-            android:id="@+id/fragmentContainer"
-            android:layout_width="match_parent"
-            android:layout_height="match_parent" />
-
+        <!-- Stacked rather than overlapping, so the fragment gets exactly the space above
+             the bottom bar (it never runs underneath it) while the bar block below still
+             reaches the screen edge and paints the system-bar strip its own colour. -->
         <LinearLayout
-            android:id="@+id/bottomNavContainer"
             android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_gravity="bottom"
+            android:layout_height="match_parent"
             android:orientation="vertical">
 
-            <View
-                android:id="@+id/bottomNavigationShadow"
+            <!-- No toolbar here: each fragment owns its own 64dp top bar, exactly like the
+                 reference app. -->
+            <androidx.fragment.app.FragmentContainerView
+                android:id="@+id/fragmentContainer"
                 android:layout_width="match_parent"
-                android:layout_height="3dp"
-                android:alpha=".5"
-                android:background="@drawable/shadow_top" />
+                android:layout_height="0dp"
+                android:layout_weight="1" />
 
-            <com.google.android.material.bottomnavigation.BottomNavigationView
-                android:id="@+id/bottomNavigation"
-                style="@style/Widget.MaterialComponents.BottomNavigationView"
+            <!-- Paints Group B for the whole bottom block: the bar itself is opaque
+                 nav_bar_bg, and this container is additionally padded by the bottom
+                 system-bar inset, so the strip below the bar is the same colour — one
+                 continuous surface from the top of the shadow to the screen edge. -->
+            <LinearLayout
+                android:id="@+id/bottomNavContainer"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:background="@drawable/bg_bottom_bar"
-                android:elevation="0dp"
-                android:paddingTop="@dimen/bottom_nav_padding_top"
-                android:paddingBottom="@dimen/bottom_nav_padding_bottom"
-                app:labelVisibilityMode="labeled"
-                app:menu="@menu/bottom_nav_menu"
-                app:itemIconSize="@dimen/bottom_nav_icon_size"
-                app:itemIconTint="@color/nav_item_tint"
-                app:itemTextColor="@color/nav_item_tint"
-                app:itemActiveIndicatorStyle="@style/App.ActiveIndicator"
-                app:itemTextAppearanceActive="@style/BottomNav.ActiveText"
-                app:itemTextAppearanceInactive="@style/BottomNav.InactiveText" />
+                android:background="@color/nav_bar_bg"
+                android:orientation="vertical">
 
+                <View
+                    android:id="@+id/bottomNavigationShadow"
+                    android:layout_width="match_parent"
+                    android:layout_height="3dp"
+                    android:alpha=".5"
+                    android:background="@drawable/shadow_top" />
+
+                <com.google.android.material.bottomnavigation.BottomNavigationView
+                    android:id="@+id/bottomNavigation"
+                    style="@style/Widget.MaterialComponents.BottomNavigationView"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:background="@drawable/bg_bottom_bar"
+                    android:elevation="0dp"
+                    android:paddingTop="@dimen/bottom_nav_padding_top"
+                    android:paddingBottom="@dimen/bottom_nav_padding_bottom"
+                    app:labelVisibilityMode="labeled"
+                    app:menu="@menu/bottom_nav_menu"
+                    app:itemIconSize="@dimen/bottom_nav_icon_size"
+                    app:itemIconTint="@color/nav_item_tint"
+                    app:itemTextColor="@color/nav_item_tint"
+                    app:itemActiveIndicatorStyle="@style/App.ActiveIndicator"
+                    app:itemTextAppearanceActive="@style/BottomNav.ActiveText"
+                    app:itemTextAppearanceInactive="@style/BottomNav.InactiveText" />
+
+            </LinearLayout>
         </LinearLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>

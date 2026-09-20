@@ -11,14 +11,14 @@
     <color name="brand_on_primary">#FFFFFF</color>
 
     <!-- LIGHT surfaces & text (Google Material light spec) -->
-    <color name="bg">#FAFAFA</color>
+    <color name="bg">#F8F9FA</color>
     <color name="surface">#FFFFFF</color>
     <color name="surface_variant">#F2F2F2</color>
     <color name="surface_container">#F5F5F5</color>
     <color name="outline">#E0E0E0</color>
     <color name="outline_variant">#EEEEEE</color>
-    <color name="text_primary">#1F1F1F</color>
-    <color name="text_secondary">#757575</color>
+    <color name="text_primary">#202124</color>
+    <color name="text_secondary">#5F6368</color>
     <color name="text_tertiary">#9E9E9E</color>
 
     <!-- Neutral tinted containers (selected tab, avatar ring, status circles) -->
@@ -32,19 +32,29 @@
     <color name="error_container">#FCE8E6</color>
     <color name="warning">#E37400</color>
 
-    <!-- Bottom navigation bar background -->
+    <!-- ============ Chrome colour groups ============
+         Two surfaces, deliberately different from each other — Google's baseline
+         Material palette (background vs. surface):
+
+           Group A  background  #F8F9FA   fragment bg == top bar == status bar
+           Group B  surface     #FFFFFF   bottom nav bar == bottom system bar
+
+         status_bar_bg / navigation_bar_bg deliberately mirror their group. Those
+         two paint the real system bars only up to API 34; from API 35 both
+         window.statusBarColor and window.navigationBarColor are no-ops, and the
+         strips are painted by the DrawerLayout background (Group A) and the
+         bottom nav container (Group B) instead. Equal values are what make the
+         old and new paths agree — change one and change its partner. -->
+    <color name="home_content_bg">#F8F9FA</color>
+    <color name="top_bar_bg">#F8F9FA</color>
+    <color name="status_bar_bg">#F8F9FA</color>
+
     <color name="nav_bar_bg">#FFFFFF</color>
-    <color name="status_bar_bg">#FFFFFF</color>
     <color name="navigation_bar_bg">#FFFFFF</color>
 
-    <!-- Top bar + fragment content backgrounds. Values are copied from the reference
-         app (Hukamnama Sahib) so the chrome matches it exactly:
-         top_gradient_start / text_primary_new_home / text_secondary_new_home /
-         home_content_bg. -->
-    <color name="top_bar_bg">#FFFFFF</color>
-    <color name="top_bar_title">#2C2620</color>
-    <color name="top_bar_icon">#81817E</color>
-    <color name="home_content_bg">#FFFFFF</color>
+    <!-- Top bar title / icon: the palette's primary and secondary text. -->
+    <color name="top_bar_title">#202124</color>
+    <color name="top_bar_icon">#5F6368</color>
 
     <!-- Google sign-in button -->
     <color name="google_btn_bg">#FFFFFF</color>

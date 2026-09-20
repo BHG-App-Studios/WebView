@@ -81,13 +81,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyInsets() {
-        // Pad the whole shell by the system bars and consume the insets, exactly like the
-        // reference app. This keeps the 64dp top bar clear of the status bar and lifts the
-        // bottom bar above the system nav bar so it holds its compact 2dp/11dp height; the
-        // two strips themselves are painted by the window colours set in onCreate.
+
         ViewCompat.setOnApplyWindowInsetsListener(binding.mainContainer) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
-            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0)
+            binding.bottomNavContainer.setPadding(0, 0, 0, systemBars.bottom)
             WindowInsetsCompat.CONSUMED
         }
     }

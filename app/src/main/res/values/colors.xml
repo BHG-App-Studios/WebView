@@ -1,36 +1,36 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!-- Launcher / splash brand background -->
-    <color name="ic_launcher_background">#4F46E5</color>
-    <color name="splash_background">#4F46E5</color>
+    <color name="ic_launcher_background">#6200EE</color>
+    <color name="splash_background">#6200EE</color>
 
-    <!-- Brand (indigo / violet, modern SaaS) -->
-    <color name="brand_primary">#4F46E5</color>
-    <color name="brand_primary_bright">#6366F1</color>
-    <color name="brand_violet">#8B5CF6</color>
+    <!-- Accent (Material light): purple #6200EE for primary actions -->
+    <color name="brand_primary">#6200EE</color>
+    <color name="brand_primary_bright">#7C4DFF</color>
+    <color name="brand_violet">#7C4DFF</color>
     <color name="brand_on_primary">#FFFFFF</color>
 
-    <!-- LIGHT surfaces & text -->
-    <color name="bg">#F6F7FB</color>
+    <!-- LIGHT surfaces & text (Google Material light spec) -->
+    <color name="bg">#FAFAFA</color>
     <color name="surface">#FFFFFF</color>
-    <color name="surface_variant">#EEF0F8</color>
-    <color name="surface_container">#F1F2FA</color>
-    <color name="outline">#E1E3EF</color>
-    <color name="outline_variant">#EAECF5</color>
-    <color name="text_primary">#171827</color>
-    <color name="text_secondary">#5C5F7A</color>
-    <color name="text_tertiary">#8A8DA6</color>
+    <color name="surface_variant">#F2F2F2</color>
+    <color name="surface_container">#F5F5F5</color>
+    <color name="outline">#E0E0E0</color>
+    <color name="outline_variant">#EEEEEE</color>
+    <color name="text_primary">#1F1F1F</color>
+    <color name="text_secondary">#757575</color>
+    <color name="text_tertiary">#9E9E9E</color>
 
-    <!-- Tinted containers -->
-    <color name="primary_container">#E7E7FE</color>
-    <color name="on_primary_container">#26237A</color>
+    <!-- Neutral tinted containers (selected tab, avatar ring, status circles) -->
+    <color name="primary_container">#EDE7F6</color>
+    <color name="on_primary_container">#1F1F1F</color>
 
     <!-- Status -->
-    <color name="success">#12A150</color>
-    <color name="success_container">#DCFCE7</color>
-    <color name="error">#DC2626</color>
-    <color name="error_container">#FEE2E2</color>
-    <color name="warning">#D97706</color>
+    <color name="success">#1E8E3E</color>
+    <color name="success_container">#E6F4EA</color>
+    <color name="error">#D93025</color>
+    <color name="error_container">#FCE8E6</color>
+    <color name="warning">#E37400</color>
 
     <!-- Scrim -->
     <color name="scrim">#66000000</color>

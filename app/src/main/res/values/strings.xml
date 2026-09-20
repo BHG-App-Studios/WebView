@@ -1,8 +1,11 @@
 <resources>
-    <string name="app_name">Website App Builder</string>
+    <!-- Launcher label -->
+    <string name="app_name">WebCraft Web to App</string>
+    <!-- Short name shown inside the app -->
+    <string name="app_display_name">WebCraft</string>
 
     <!-- Auth -->
-    <string name="auth_title">Website App Builder</string>
+    <string name="auth_title">WebCraft</string>
     <string name="auth_subtitle">Turn any website into a polished Android app in minutes.</string>
     <string name="sign_in_with_google">Continue with Google</string>
     <string name="auth_terms">Secured by Google · Your data stays private</string>

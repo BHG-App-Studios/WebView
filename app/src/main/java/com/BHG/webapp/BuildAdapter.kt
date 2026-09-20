@@ -43,7 +43,7 @@ class BuildAdapter(
         val b = holder.binding
         val ctx = b.root.context
 
-        b.itemAppName.text = item.appName.ifEmpty { ctx.getString(R.string.app_name) }
+        b.itemAppName.text = item.appName.ifEmpty { ctx.getString(R.string.app_display_name) }
         b.itemUrl.text = item.url
         b.itemDate.text = if (item.createdAtMs > 0) DATE_FMT.format(Date(item.createdAtMs)) else ""
 

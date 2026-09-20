@@ -1,46 +1,49 @@
 <resources>
-    <string name="app_name">WebCraft: Website to APK &amp; AAB</string>
+    <string name="app_name">Website App Builder</string>
 
     <!-- Auth -->
-    <string name="auth_subtitle">Sign in with your Google account to continue</string>
-    <string name="sign_in_with_google">Sign in with Google</string>
+    <string name="auth_title">Website App Builder</string>
+    <string name="auth_subtitle">Turn any website into a polished Android app in minutes.</string>
+    <string name="sign_in_with_google">Continue with Google</string>
+    <string name="auth_terms">Secured by Google · Your data stays private</string>
     <string name="sign_in_failed">Sign-in failed. Please try again.</string>
     <string name="sign_in_no_network">No internet connection. Please check your network and try again.</string>
     <string name="sign_in_cancelled">Sign-in cancelled</string>
     <string name="sign_in_no_account">No Google account found on this device. Add a Google account and try again.</string>
 
-    <!-- Builder -->
-    <string name="builder_title">Website to App</string>
-    <string name="builder_subtitle">Turn any website into an Android app</string>
-    <string name="sign_out">Sign out</string>
+    <!-- Bottom navigation -->
+    <string name="nav_home">Home</string>
+    <string name="nav_history">History</string>
+    <string name="nav_profile">Profile</string>
 
+    <!-- Toolbar titles -->
+    <string name="title_home">Build App</string>
+    <string name="title_history">Build History</string>
+    <string name="title_profile">Profile</string>
+
+    <!-- Home / builder -->
+    <string name="home_greeting">Create your app</string>
+    <string name="builder_subtitle">Enter a URL, pick your features, and build.</string>
     <string name="label_url">Website URL</string>
-    <string name="hint_url">https://example.com</string>
     <string name="label_app_name">App name</string>
-    <string name="hint_app_name">My App</string>
     <string name="label_package_name">Package name (optional)</string>
-    <string name="hint_package_name">com.example.app</string>
     <string name="package_helper">Leave blank to auto-generate from the URL</string>
-
     <string name="section_features">Features</string>
     <string name="section_permissions">Permissions</string>
     <string name="section_permissions_hint">Turn off anything your app does not need. Internet access is always included.</string>
-
     <string name="build_app">Build App</string>
     <string name="building">Building your app…</string>
     <string name="build_queued">Build queued. This usually takes a few minutes.</string>
     <string name="build_ready">Your app is ready</string>
     <string name="download_apk">Download APK</string>
     <string name="build_failed">Build failed. Please try again.</string>
-    <string name="build_timeout">Still building. Check back shortly or tap Download to retry.</string>
     <string name="download_started">Download started. Check your notifications.</string>
-
     <string name="error_url_required">Enter a website URL</string>
     <string name="error_url_invalid">Enter a valid http or https URL</string>
     <string name="error_no_network">No internet connection</string>
     <string name="error_generic">Something went wrong. Please try again.</string>
 
-    <!-- Feature toggle labels (order matches BuildOption list in code) -->
+    <!-- Feature toggle labels -->
     <string name="opt_progress_bar">Top progress bar</string>
     <string name="opt_circular_progress">Center loading spinner</string>
     <string name="opt_swipe_refresh">Pull to refresh</string>
@@ -57,4 +60,31 @@
     <string name="perm_location">Location</string>
     <string name="perm_vibrate">Vibration</string>
     <string name="perm_notifications">Notifications</string>
+
+    <!-- History -->
+    <string name="history_empty_title">No builds yet</string>
+    <string name="history_empty_subtitle">Your generated apps will appear here once you build one.</string>
+    <string name="status_building">Building</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_failed">Failed</string>
+
+    <!-- Profile -->
+    <string name="profile_stat_total">Total builds</string>
+    <string name="profile_stat_ready">Ready</string>
+    <string name="profile_user_id">User ID</string>
+
+    <!-- Drawer -->
+    <string name="drawer_subtitle">Settings &amp; more</string>
+    <string name="drawer_close">Close menu</string>
+    <string name="drawer_section_appearance">Appearance</string>
+    <string name="drawer_section_about">About</string>
+    <string name="drawer_app_theme">App theme</string>
+    <string name="drawer_theme_system">System</string>
+    <string name="drawer_theme_light">Light</string>
+    <string name="drawer_theme_dark">Dark</string>
+    <string name="privacy_policy">Privacy Policy</string>
+    <string name="terms_conditions">Terms &amp; Conditions</string>
+    <string name="rate_us">Rate this app</string>
+    <string name="sign_out">Sign out</string>
+    <string name="drawer_version">Version 1.0</string>
 </resources>

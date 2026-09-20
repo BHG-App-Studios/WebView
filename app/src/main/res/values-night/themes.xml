@@ -1,8 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <!--
-        Kept aligned with values/themes.xml: Theme.Material3.DayNight.NoActionBar
-        already resolves the night palette, so no per-night overrides are needed.
+        The base Theme.WebsiteAppBuilder (values/themes.xml) resolves all of its
+        colors through @color/* references, and values-night/colors.xml supplies
+        the dark palette — so no per-night theme override is needed here.
     -->
-    <style name="Theme.WebsiteAppBuilder" parent="Theme.Material3.DayNight.NoActionBar" />
 </resources>

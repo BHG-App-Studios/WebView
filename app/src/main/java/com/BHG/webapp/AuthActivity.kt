@@ -368,8 +368,15 @@ class AuthActivity : AppCompatActivity() {
     private fun setLoading(loading: Boolean) {
         signInInProgress = loading
         if (!this::binding.isInitialized) return
+
+        // Spinner sits centered on the button; hide the button's label + logo
+        // while it spins so nothing shifts and the button keeps its size/color.
         binding.authProgress.visibility = if (loading) View.VISIBLE else View.GONE
-        binding.signInButton.isEnabled = !loading
+        binding.signInButton.text = if (loading) "" else getString(R.string.sign_in_with_google)
+        binding.signInButton.icon =
+            if (loading) null else ContextCompat.getDrawable(this, R.drawable.ic_google_logo)
+        // Keep the filled look (don't grey it out); re-entry is blocked by signInInProgress.
+        binding.signInButton.isClickable = !loading
     }
 
     private fun toast(resId: Int) {

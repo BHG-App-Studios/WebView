@@ -4,28 +4,58 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/drawerLayout"
     android:layout_width="match_parent"
-    android:layout_height="match_parent">
+    android:layout_height="match_parent"
+    android:background="@color/home_content_bg">
 
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/mainContainer"
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
+        <!-- 64dp solid top bar, matching the reference app: the bar is a plain
+             LinearLayout rather than a MaterialToolbar so the icon button, title
+             and padding come out at exactly the same sizes and offsets. -->
         <com.google.android.material.appbar.AppBarLayout
             android:id="@+id/appBar"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:background="@android:color/transparent"
+            android:background="@drawable/bg_top_bar"
+            android:stateListAnimator="@null"
             app:elevation="0dp"
             app:liftOnScroll="false">
 
-            <com.google.android.material.appbar.MaterialToolbar
-                android:id="@+id/toolbar"
+            <LinearLayout
+                android:id="@+id/topBar"
                 android:layout_width="match_parent"
-                android:layout_height="?attr/actionBarSize"
-                app:navigationIcon="@drawable/ic_menu"
-                app:navigationIconTint="?attr/colorOnSurface"
-                app:contentInsetStartWithNavigation="8dp" />
+                android:layout_height="@dimen/main_bar_height"
+                android:background="@drawable/bg_top_bar"
+                android:gravity="center_vertical"
+                android:paddingStart="8dp"
+                android:paddingTop="9dp"
+                android:paddingEnd="8dp"
+                android:paddingBottom="9dp">
+
+                <ImageButton
+                    android:id="@+id/topBarMenu"
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_marginEnd="8dp"
+                    android:background="?attr/selectableItemBackgroundBorderless"
+                    android:contentDescription="@string/open_menu"
+                    android:padding="8dp"
+                    android:src="@drawable/ic_menu"
+                    app:tint="@color/top_bar_icon" />
+
+                <TextView
+                    android:id="@+id/topBarTitle"
+                    android:layout_width="0dp"
+                    android:layout_height="wrap_content"
+                    android:layout_weight="1"
+                    android:fontFamily="@font/roboto_bold"
+                    android:textColor="@color/top_bar_title"
+                    android:textSize="@dimen/text_size_20"
+                    android:textStyle="bold" />
+            </LinearLayout>
         </com.google.android.material.appbar.AppBarLayout>
 
         <androidx.fragment.app.FragmentContainerView
@@ -50,6 +80,7 @@
 
             <com.google.android.material.bottomnavigation.BottomNavigationView
                 android:id="@+id/bottomNavigation"
+                style="@style/Widget.MaterialComponents.BottomNavigationView"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:background="@drawable/bg_bottom_bar"
@@ -72,7 +103,7 @@
     <include
         android:id="@+id/navigationDrawer"
         layout="@layout/drawer_panel"
-        android:layout_width="308dp"
+        android:layout_width="300dp"
         android:layout_height="match_parent"
         android:layout_gravity="start" />
 

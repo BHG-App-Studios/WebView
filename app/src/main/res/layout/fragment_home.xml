@@ -5,6 +5,7 @@
     android:id="@+id/scroll"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:background="@color/home_content_bg"
     android:clipToPadding="false"
     android:paddingBottom="88dp"
     android:scrollbars="none">

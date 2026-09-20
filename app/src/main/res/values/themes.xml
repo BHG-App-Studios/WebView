@@ -116,13 +116,20 @@
         <item name="hintTextColor">?attr/colorPrimary</item>
     </style>
 
-    <style name="BottomNav.ActiveText" parent="TextAppearance.Material3.LabelMedium">
+    <!-- Bottom nav labels. Parent is TextAppearance.MaterialComponents.Caption, the same
+         one the reference app uses, so the label's line height — and therefore the whole
+         bar height — comes out identical. -->
+    <style name="BottomNav.ActiveText" parent="TextAppearance.MaterialComponents.Caption">
         <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:fontFamily">@font/roboto_bold</item>
         <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">bold</item>
     </style>
-    <style name="BottomNav.InactiveText" parent="TextAppearance.Material3.LabelMedium">
+    <style name="BottomNav.InactiveText" parent="TextAppearance.MaterialComponents.Caption">
         <item name="fontFamily">@font/roboto_regular</item>
+        <item name="android:fontFamily">@font/roboto_regular</item>
         <item name="android:textSize">13sp</item>
+        <item name="android:textStyle">normal</item>
     </style>
     <style name="App.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/primary_container</item>

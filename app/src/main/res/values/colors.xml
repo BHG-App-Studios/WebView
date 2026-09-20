@@ -37,6 +37,15 @@
     <color name="status_bar_bg">#FFFFFF</color>
     <color name="navigation_bar_bg">#FFFFFF</color>
 
+    <!-- Top bar + fragment content backgrounds. Values are copied from the reference
+         app (Hukamnama Sahib) so the chrome matches it exactly:
+         top_gradient_start / text_primary_new_home / text_secondary_new_home /
+         home_content_bg. -->
+    <color name="top_bar_bg">#FFFFFF</color>
+    <color name="top_bar_title">#2C2620</color>
+    <color name="top_bar_icon">#81817E</color>
+    <color name="home_content_bg">#FFFFFF</color>
+
     <!-- Google sign-in button -->
     <color name="google_btn_bg">#FFFFFF</color>
     <color name="google_btn_stroke">#E0E0E0</color>

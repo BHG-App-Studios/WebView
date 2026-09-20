@@ -4,6 +4,11 @@
     <dimen name="card_radius">20dp</dimen>
     <dimen name="field_radius">14dp</dimen>
 
+    <!-- Top bar (matches reference production app): 64dp tall, solid background,
+         8dp side padding, 40dp icon buttons with 8dp internal padding, 20sp bold title. -->
+    <dimen name="main_bar_height">64dp</dimen>
+    <dimen name="text_size_20">20sp</dimen>
+
     <!-- Bottom navigation (matches reference production app) -->
     <dimen name="bottom_nav_icon_size">28dp</dimen>
     <dimen name="bottom_nav_padding_top">2dp</dimen>

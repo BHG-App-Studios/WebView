@@ -33,6 +33,12 @@
     <color name="status_bar_bg">#1a1818</color>
     <color name="navigation_bar_bg">#191617</color>
 
+    <!-- Top bar + fragment content backgrounds (reference app values) -->
+    <color name="top_bar_bg">#242424</color>
+    <color name="top_bar_title">#FDFBF7</color>
+    <color name="top_bar_icon">#BCB9B7</color>
+    <color name="home_content_bg">#1a1818</color>
+
     <!-- Google sign-in button: dark surface with light text in dark mode -->
     <color name="google_btn_bg">#1E1E1E</color>
     <color name="google_btn_stroke">#3A3A3A</color>

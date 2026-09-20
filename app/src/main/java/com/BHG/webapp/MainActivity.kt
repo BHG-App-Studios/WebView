@@ -9,7 +9,6 @@ import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
 import androidx.core.view.GravityCompat
 import androidx.core.view.ViewCompat
 import androidx.core.view.WindowInsetsCompat
-import androidx.core.view.updatePadding
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.BHG.webapp.databinding.ActivityMainBinding
@@ -21,7 +20,7 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
 /**
- * App shell: a Material toolbar, a start drawer of settings, and a three-tab
+ * App shell: a 64dp top bar, a start drawer of settings, and a three-tab
  * bottom navigation (Home / History / Profile) hosting fragments.
  *
  * The activity owns cross-cutting concerns — the auth guard, profile upkeep,
@@ -38,8 +37,11 @@ class MainActivity : AppCompatActivity() {
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
-        enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        enableEdgeToEdge()
+        window.statusBarColor = getColor(R.color.status_bar_bg)
+        window.navigationBarColor = getColor(R.color.navigation_bar_bg)
 
         auth = try {
             FirebaseAuth.getInstance()
@@ -65,11 +67,8 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
-        window.statusBarColor = getColor(R.color.status_bar_bg)
-        window.navigationBarColor = getColor(R.color.navigation_bar_bg)
-
         applyInsets()
-        setupToolbar()
+        setupTopBar()
         setupDrawer()
         setupBottomNav()
 
@@ -82,21 +81,19 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyInsets() {
-        // Pad the whole content area by the system bars and consume the insets, exactly
-        // like the reference app. This lifts the bottom bar above the system nav bar so it
-        // keeps its compact 2dp/11dp height; the system nav strip itself is painted by
-        // window.navigationBarColor, which matches the bar background.
+        // Pad the whole shell by the system bars and consume the insets, exactly like the
+        // reference app. This keeps the 64dp top bar clear of the status bar and lifts the
+        // bottom bar above the system nav bar so it holds its compact 2dp/11dp height; the
+        // two strips themselves are painted by the window colours set in onCreate.
         ViewCompat.setOnApplyWindowInsetsListener(binding.mainContainer) { v, insets ->
-            val bars = insets.getInsets(
-                WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
-            )
-            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
+            v.setPadding(systemBars.left, systemBars.top, systemBars.right, systemBars.bottom)
             WindowInsetsCompat.CONSUMED
         }
     }
 
-    private fun setupToolbar() {
-        binding.toolbar.setNavigationOnClickListener {
+    private fun setupTopBar() {
+        binding.topBarMenu.setOnClickListener {
             binding.drawerLayout.openDrawer(GravityCompat.START)
         }
     }
@@ -124,7 +121,7 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun updateTitle(itemId: Int) {
-        binding.toolbar.title = getString(
+        binding.topBarTitle.text = getString(
             when (itemId) {
                 R.id.nav_history -> R.string.title_history
                 R.id.nav_profile -> R.string.title_profile

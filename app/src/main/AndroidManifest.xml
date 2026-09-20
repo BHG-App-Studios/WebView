@@ -30,8 +30,7 @@
         android:theme="@style/Theme.WebsiteAppBuilder">
 
         <activity
-            android:name=".MainActivity"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:name=".AuthActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/Theme.WebsiteAppBuilder.Splash"
@@ -41,6 +40,14 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <activity
+            android:name=".MainActivity"
+            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden"
+            android:exported="false"
+            android:launchMode="singleTop"
+            android:theme="@style/Theme.WebsiteAppBuilder"
+            android:windowSoftInputMode="adjustResize" />
 
     </application>
 

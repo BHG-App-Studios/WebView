@@ -38,6 +38,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
 import androidx.core.view.updatePadding
 import com.BHG.webapp.databinding.ActivityMainBinding
+import com.google.firebase.auth.FirebaseAuth
 import java.net.URISyntaxException
 import kotlin.math.roundToInt
 
@@ -119,6 +120,14 @@ class MainActivity : AppCompatActivity() {
         installSplashScreen()
         enableEdgeToEdge()
         super.onCreate(savedInstanceState)
+
+        // Guard: never show the app while signed out (killed session, post sign-out, etc.).
+        if (FirebaseAuth.getInstance().currentUser == null) {
+            startActivity(Intent(this, AuthActivity::class.java))
+            finish()
+            return
+        }
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

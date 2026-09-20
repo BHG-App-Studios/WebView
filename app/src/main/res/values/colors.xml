@@ -35,6 +35,11 @@
     <!-- Bottom navigation bar background -->
     <color name="nav_bar_bg">#FFFFFF</color>
 
+    <!-- Google sign-in button -->
+    <color name="google_btn_bg">#FFFFFF</color>
+    <color name="google_btn_stroke">#E0E0E0</color>
+    <color name="google_btn_text">#1F1F1F</color>
+
     <!-- Scrim -->
     <color name="scrim">#66000000</color>
 </resources>

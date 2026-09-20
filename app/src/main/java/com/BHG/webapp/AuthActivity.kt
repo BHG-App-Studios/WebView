@@ -1,13 +1,22 @@
 package com.BHG.webapp
 
+import android.animation.ValueAnimator
 import android.content.Context
 import android.content.Intent
+import android.graphics.Color
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.CancellationSignal
+import android.text.Spannable
+import android.text.SpannableString
+import android.text.method.LinkMovementMethod
+import android.text.style.ClickableSpan
 import android.util.Log
 import android.view.View
+import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.animation.DecelerateInterpolator
+import android.view.animation.OvershootInterpolator
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -64,6 +73,9 @@ class AuthActivity : AppCompatActivity() {
     // Guards against double taps launching two credential requests at once.
     private var signInInProgress = false
 
+    // Looping arrow animation in the hero.
+    private var arrowAnimator: ValueAnimator? = null
+
     // Allows an in-flight credential request to be cancelled on teardown.
     private var cancellationSignal: CancellationSignal? = null
 
@@ -111,6 +123,106 @@ class AuthActivity : AppCompatActivity() {
         }
 
         binding.signInButton.setOnClickListener { startSignIn() }
+
+        setupTermsLinks()
+        runEntranceAnimations()
+    }
+
+    /** Builds the "By continuing…" line with tappable Privacy / Terms links. */
+    private fun setupTermsLinks() {
+        val privacy = getString(R.string.auth_terms_privacy)
+        val tos = getString(R.string.auth_terms_tos)
+        val full = getString(R.string.auth_terms, privacy, tos)
+
+        val spannable = SpannableString(full)
+        linkify(spannable, full, privacy, PRIVACY_URL)
+        linkify(spannable, full, tos, TERMS_URL)
+
+        binding.termsText.text = spannable
+        binding.termsText.movementMethod = LinkMovementMethod.getInstance()
+        binding.termsText.highlightColor = Color.TRANSPARENT
+    }
+
+    private fun linkify(spannable: SpannableString, full: String, label: String, url: String) {
+        val start = full.indexOf(label)
+        if (start < 0) return
+        spannable.setSpan(object : ClickableSpan() {
+            override fun onClick(widget: View) = openUrl(url)
+            override fun updateDrawState(ds: android.text.TextPaint) {
+                super.updateDrawState(ds)
+                ds.isUnderlineText = false
+            }
+        }, start, start + label.length, Spannable.SPAN_EXCLUSIVE_EXCLUSIVE)
+    }
+
+    private fun openUrl(url: String) {
+        try {
+            startActivity(Intent(Intent.ACTION_VIEW, android.net.Uri.parse(url)))
+        } catch (e: Exception) {
+            Log.w(TAG, "openUrl failed: ${e.message}")
+        }
+    }
+
+    /**
+     * Staggered entrance for the hero, title, subtitle, button, and terms, plus
+     * a gentle looping nudge on the arrow so the "web → app" idea reads as motion.
+     * All views are guarded and animations are cancelled on destroy.
+     */
+    private fun runEntranceAnimations() {
+        val globe = binding.heroGlobe
+        val apk = binding.heroApk
+        val arrow = binding.heroArrow
+
+        // Start hidden.
+        listOf(globe, apk, arrow, binding.titleText, binding.subtitleText,
+            binding.signInButton, binding.termsText).forEach { it.alpha = 0f }
+
+        globe.translationX = -60f
+        apk.translationX = 60f
+        arrow.scaleX = 0f
+        arrow.scaleY = 0f
+
+        globe.animate().alpha(1f).translationX(0f)
+            .setStartDelay(80).setDuration(480)
+            .setInterpolator(DecelerateInterpolator()).start()
+
+        apk.animate().alpha(1f).translationX(0f)
+            .setStartDelay(220).setDuration(480)
+            .setInterpolator(DecelerateInterpolator()).start()
+
+        arrow.animate().alpha(1f).scaleX(1f).scaleY(1f)
+            .setStartDelay(460).setDuration(360)
+            .setInterpolator(OvershootInterpolator())
+            .withEndAction { startArrowLoop() }.start()
+
+        fadeUp(binding.titleText, 520)
+        fadeUp(binding.subtitleText, 620)
+        fadeUp(binding.signInButton, 740)
+        fadeUp(binding.termsText, 840)
+    }
+
+    private fun fadeUp(view: View, delay: Long) {
+        view.translationY = 40f
+        view.animate().alpha(1f).translationY(0f)
+            .setStartDelay(delay).setDuration(460)
+            .setInterpolator(DecelerateInterpolator()).start()
+    }
+
+    /** Subtle, infinite left-right nudge on the arrow. */
+    private fun startArrowLoop() {
+        if (isFinishing || isDestroyed) return
+        val arrow = binding.heroArrow
+        arrowAnimator?.cancel()
+        arrowAnimator = ValueAnimator.ofFloat(0f, 10f, 0f).apply {
+            duration = 1100
+            repeatCount = ValueAnimator.INFINITE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { va ->
+                if (this@AuthActivity.isFinishing || this@AuthActivity.isDestroyed) return@addUpdateListener
+                arrow.translationX = va.animatedValue as Float
+            }
+            start()
+        }
     }
 
     private fun startSignIn() {
@@ -288,10 +400,14 @@ class AuthActivity : AppCompatActivity() {
         // Cancel any in-flight credential request so its callback can't fire post-teardown.
         cancellationSignal?.cancel()
         cancellationSignal = null
+        arrowAnimator?.cancel()
+        arrowAnimator = null
         super.onDestroy()
     }
 
     private companion object {
         private const val TAG = "AuthActivity"
+        private const val PRIVACY_URL = "https://sites.google.com/view/webcraft-privacy"
+        private const val TERMS_URL = "https://sites.google.com/view/webcraft-terms"
     }
 }

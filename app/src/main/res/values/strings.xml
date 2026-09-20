@@ -6,9 +6,14 @@
 
     <!-- Auth -->
     <string name="auth_title">WebCraft</string>
-    <string name="auth_subtitle">Turn any website into a polished Android app in minutes.</string>
+    <string name="auth_subtitle">Turn any website into a fast, polished Android app — no code, no setup. Pick your features and permissions, tap build, and download a ready-to-install APK in minutes.</string>
     <string name="sign_in_with_google">Continue with Google</string>
-    <string name="auth_terms">Secured by Google · Your data stays private</string>
+    <string name="auth_hero_web">Website</string>
+    <string name="auth_hero_app">Android App</string>
+    <!-- Terms line with clickable links; %1$s and %2$s are the link labels -->
+    <string name="auth_terms">By continuing, you agree to our %1$s and %2$s.</string>
+    <string name="auth_terms_privacy">Privacy Policy</string>
+    <string name="auth_terms_tos">Terms of Service</string>
     <string name="sign_in_failed">Sign-in failed. Please try again.</string>
     <string name="sign_in_no_network">No internet connection. Please check your network and try again.</string>
     <string name="sign_in_cancelled">Sign-in cancelled</string>

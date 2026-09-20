@@ -31,6 +31,11 @@
     <!-- Bottom navigation bar background (slightly lifted from #121212 bg) -->
     <color name="nav_bar_bg">#242424</color>
 
+    <!-- Google sign-in button: dark surface with light text in dark mode -->
+    <color name="google_btn_bg">#1E1E1E</color>
+    <color name="google_btn_stroke">#3A3A3A</color>
+    <color name="google_btn_text">#E6E6E6</color>
+
     <!-- Scrim -->
     <color name="scrim">#99000000</color>
 </resources>

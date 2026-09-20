@@ -14,49 +14,116 @@
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1.2" />
+        android:layout_weight="1" />
 
-    <!-- Logo with gradient halo -->
-    <FrameLayout
-        android:layout_width="128dp"
-        android:layout_height="128dp">
-
-        <View
-            android:layout_width="128dp"
-            android:layout_height="128dp"
-            android:alpha="0.18"
-            android:background="@drawable/bg_auth_hero" />
-
-        <View
-            android:layout_width="88dp"
-            android:layout_height="88dp"
-            android:layout_gravity="center"
-            android:background="@drawable/bg_logo_tile" />
-
-        <ImageView
-            android:layout_width="48dp"
-            android:layout_height="48dp"
-            android:layout_gravity="center"
-            android:importantForAccessibility="no"
-            android:src="@drawable/ic_apps"
-            app:tint="@color/brand_on_primary" />
-    </FrameLayout>
-
-    <TextView
+    <!-- Animated hero: Website  →  Android app -->
+    <LinearLayout
+        android:id="@+id/heroRow"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="28dp"
+        android:orientation="horizontal"
+        android:gravity="center_vertical">
+
+        <!-- Website (globe) -->
+        <LinearLayout
+            android:id="@+id/heroGlobe"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <FrameLayout
+                android:layout_width="76dp"
+                android:layout_height="76dp">
+
+                <View
+                    android:layout_width="76dp"
+                    android:layout_height="76dp"
+                    android:background="@drawable/bg_circle_primary" />
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/globe_24px"
+                    app:tint="?attr/colorPrimary" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/auth_hero_web"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+
+        <!-- Animated arrow -->
+        <ImageView
+            android:id="@+id/heroArrow"
+            android:layout_width="34dp"
+            android:layout_height="34dp"
+            android:layout_marginStart="10dp"
+            android:layout_marginEnd="10dp"
+            android:layout_marginBottom="24dp"
+            android:importantForAccessibility="no"
+            android:src="@drawable/ic_arrow_forward"
+            app:tint="?attr/colorPrimary" />
+
+        <!-- Android app (apk) -->
+        <LinearLayout
+            android:id="@+id/heroApk"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:gravity="center">
+
+            <FrameLayout
+                android:layout_width="76dp"
+                android:layout_height="76dp">
+
+                <View
+                    android:layout_width="76dp"
+                    android:layout_height="76dp"
+                    android:background="@drawable/bg_logo_tile" />
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:importantForAccessibility="no"
+                    android:src="@drawable/apk_24px"
+                    app:tint="@color/brand_on_primary" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/auth_hero_app"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+    </LinearLayout>
+
+    <TextView
+        android:id="@+id/titleText"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="36dp"
         android:text="@string/auth_title"
         android:textAppearance="?attr/textAppearanceHeadlineMedium"
         android:textColor="?attr/colorOnSurface"
         android:gravity="center" />
 
     <TextView
-        android:layout_width="wrap_content"
+        android:id="@+id/subtitleText"
+        android:layout_width="match_parent"
         android:layout_height="wrap_content"
-        android:layout_marginTop="10dp"
+        android:layout_marginTop="12dp"
         android:gravity="center"
-        android:lineSpacingExtra="3dp"
+        android:lineSpacingExtra="4dp"
         android:text="@string/auth_subtitle"
         android:textAppearance="?attr/textAppearanceBodyLarge"
         android:textColor="?attr/colorOnSurfaceVariant" />
@@ -64,41 +131,51 @@
     <Space
         android:layout_width="match_parent"
         android:layout_height="0dp"
-        android:layout_weight="1" />
+        android:layout_weight="1.1" />
 
     <ProgressBar
         android:id="@+id/authProgress"
         android:layout_width="34dp"
         android:layout_height="34dp"
-        android:layout_marginBottom="20dp"
+        android:layout_marginBottom="18dp"
         android:indeterminateTint="?attr/colorPrimary"
         android:visibility="gone" />
 
     <com.google.android.material.button.MaterialButton
         android:id="@+id/signInButton"
-        style="@style/Widget.Material3.Button.OutlinedButton.Icon"
+        style="@style/Widget.MaterialComponents.Button"
         android:layout_width="match_parent"
-        android:layout_height="56dp"
+        android:layout_height="58dp"
         android:text="@string/sign_in_with_google"
-        android:textColor="?attr/colorOnSurface"
+        android:textColor="@color/google_btn_text"
         android:textSize="15sp"
-        android:fontFamily="@font/roboto_semibold"
+        android:fontFamily="@font/roboto_medium"
+        android:letterSpacing="0.01"
         android:textAllCaps="false"
-        app:cornerRadius="@dimen/field_radius"
+        android:paddingStart="16dp"
+        android:paddingEnd="20dp"
+        app:backgroundTint="@color/google_btn_bg"
+        app:cornerRadius="30dp"
+        app:elevation="0dp"
         app:icon="@drawable/ic_google_logo"
         app:iconGravity="textStart"
-        app:iconPadding="12dp"
+        app:iconPadding="14dp"
+        app:iconSize="22dp"
         app:iconTint="@null"
-        app:strokeColor="?attr/colorOutline" />
+        app:rippleColor="?attr/colorControlHighlight"
+        app:strokeColor="@color/google_btn_stroke"
+        app:strokeWidth="1dp" />
 
     <TextView
+        android:id="@+id/termsText"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:layout_marginTop="20dp"
-        android:layout_marginBottom="32dp"
+        android:layout_marginTop="18dp"
+        android:layout_marginBottom="30dp"
         android:gravity="center"
-        android:text="@string/auth_terms"
+        android:lineSpacingExtra="3dp"
         android:textAppearance="?attr/textAppearanceBodySmall"
-        android:textColor="?attr/colorOnSurfaceVariant" />
+        android:textColor="?attr/colorOnSurfaceVariant"
+        android:textColorLink="?attr/colorPrimary" />
 
 </LinearLayout>

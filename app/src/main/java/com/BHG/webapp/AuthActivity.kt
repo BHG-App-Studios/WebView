@@ -31,6 +31,9 @@ import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.GoogleAuthProvider
+import com.google.firebase.firestore.FieldValue
+import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.SetOptions
 import java.security.MessageDigest
 import java.security.SecureRandom
 
@@ -210,6 +213,7 @@ class AuthActivity : AppCompatActivity() {
             if (isFinishing || isDestroyed) return@addOnCompleteListener
 
             if (task.isSuccessful && localAuth.currentUser != null) {
+                saveProfile(localAuth.currentUser!!)
                 goToMain()
             } else {
                 Log.w(TAG, "Firebase auth failed: ${task.exception?.message}")
@@ -217,6 +221,31 @@ class AuthActivity : AppCompatActivity() {
                 toast(R.string.sign_in_failed)
             }
         }
+    }
+
+    /**
+     * Upserts the user profile under users/{uid} the moment sign-in succeeds,
+     * so a new user's details are stored immediately — not only on their first
+     * build. Merge, so it never disturbs an existing builds subcollection.
+     * Fire-and-forget: a failure here must not block entering the app.
+     */
+    private fun saveProfile(user: com.google.firebase.auth.FirebaseUser) {
+        val db = try {
+            FirebaseFirestore.getInstance()
+        } catch (e: Exception) {
+            Log.w(TAG, "Firestore init failed: ${e.message}")
+            return
+        }
+        val profile = mapOf(
+            "uid" to user.uid,
+            "email" to (user.email ?: ""),
+            "displayName" to (user.displayName ?: ""),
+            "photoUrl" to (user.photoUrl?.toString() ?: ""),
+            "firstOpenAt" to FieldValue.serverTimestamp()
+        )
+        db.collection("users").document(user.uid)
+            .set(profile, SetOptions.merge())
+            .addOnFailureListener { e -> Log.w(TAG, "Profile save failed: ${e.message}") }
     }
 
     private fun goToMain() {

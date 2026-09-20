@@ -120,6 +120,9 @@ class MainActivity : AppCompatActivity() {
             null
         }
 
+        // Refresh lastActiveAt on every launch (user is guaranteed signed in here).
+        auth?.currentUser?.let { saveProfile(it) }
+
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 

@@ -34,6 +34,8 @@
     <string name="title_history">Build History</string>
     <string name="title_profile">Profile</string>
 
+    <string name="help">Help</string>
+
     <!-- Home / builder -->
     <string name="home_greeting">Create your app</string>
     <string name="builder_subtitle">Enter a URL, pick your features, and build.</string>

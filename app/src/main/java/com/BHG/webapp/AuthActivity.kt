@@ -129,6 +129,7 @@ class AuthActivity : AppCompatActivity() {
         }
 
         binding.signInButton.setOnClickListener { startSignIn() }
+        binding.helpButton.setOnClickListener { openUrl(HELP_URL) }
 
         setupTermsLinks()
         runEntranceAnimations()
@@ -439,5 +440,6 @@ class AuthActivity : AppCompatActivity() {
         private const val TAG = "AuthActivity"
         private const val PRIVACY_URL = "https://sites.google.com/view/webcraft-privacy"
         private const val TERMS_URL = "https://sites.google.com/view/webcraft-terms"
+        private const val HELP_URL = "https://sites.google.com/view/webcraft-help"
     }
 }

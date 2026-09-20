@@ -46,6 +46,7 @@ class HistoryFragment : Fragment() {
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
         adapter = BuildAdapter(onDownload = ::download)
+        binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
         binding.historyList.adapter = adapter
         loadBuilds()

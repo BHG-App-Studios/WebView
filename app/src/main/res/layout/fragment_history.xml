@@ -1,70 +1,113 @@
 <?xml version="1.0" encoding="utf-8"?>
-<FrameLayout xmlns:android="http://schemas.android.com/apk/res/android"
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="@color/home_content_bg">
+    android:background="@color/home_content_bg"
+    android:orientation="vertical">
 
-    <androidx.recyclerview.widget.RecyclerView
-        android:id="@+id/historyList"
-        android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:clipToPadding="false"
-        android:paddingStart="@dimen/screen_margin"
-        android:paddingEnd="@dimen/screen_margin"
-        android:paddingTop="4dp"
-        android:paddingBottom="88dp"
-        android:scrollbars="none" />
-
-    <ProgressBar
-        android:id="@+id/historyProgress"
-        android:layout_width="36dp"
-        android:layout_height="36dp"
-        android:layout_gravity="center"
-        android:indeterminateTint="?attr/colorPrimary"
-        android:visibility="gone" />
-
+    <!-- 64dp solid top bar, owned by this fragment — the reference app's list-screen
+         pattern (fragment_hukamnama_list.xml), with the drawer button in place of Back. -->
     <LinearLayout
-        android:id="@+id/emptyState"
+        android:id="@+id/topBar"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:orientation="vertical"
-        android:gravity="center"
-        android:padding="32dp"
-        android:visibility="gone">
+        android:layout_height="@dimen/main_bar_height"
+        android:background="@drawable/bg_top_bar"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="9dp"
+        android:paddingEnd="8dp"
+        android:paddingBottom="9dp">
 
-        <FrameLayout
-            android:layout_width="84dp"
-            android:layout_height="84dp">
-
-            <View
-                android:layout_width="84dp"
-                android:layout_height="84dp"
-                android:background="@drawable/bg_circle_primary" />
-
-            <ImageView
-                android:layout_width="40dp"
-                android:layout_height="40dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_history"
-                app:tint="?attr/colorPrimary" />
-        </FrameLayout>
+        <ImageButton
+            android:id="@+id/topBarMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/open_menu"
+            android:padding="8dp"
+            android:src="@drawable/ic_menu"
+            app:tint="@color/top_bar_icon" />
 
         <TextView
-            android:layout_width="wrap_content"
+            android:id="@+id/topBarTitle"
+            android:layout_width="0dp"
             android:layout_height="wrap_content"
-            android:layout_marginTop="18dp"
-            android:text="@string/history_empty_title"
-            android:textAppearance="?attr/textAppearanceTitleMedium"
-            android:textColor="?attr/colorOnSurface" />
-
-        <TextView
-            android:layout_width="wrap_content"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="6dp"
-            android:gravity="center"
-            android:text="@string/history_empty_subtitle"
-            android:textAppearance="?attr/textAppearanceBodyMedium"
-            android:textColor="?attr/colorOnSurfaceVariant" />
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_bold"
+            android:text="@string/title_history"
+            android:textColor="@color/top_bar_title"
+            android:textSize="@dimen/text_size_20"
+            android:textStyle="bold" />
     </LinearLayout>
-</FrameLayout>
+
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <androidx.recyclerview.widget.RecyclerView
+            android:id="@+id/historyList"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:clipToPadding="false"
+            android:paddingStart="@dimen/screen_margin"
+            android:paddingEnd="@dimen/screen_margin"
+            android:paddingTop="4dp"
+            android:paddingBottom="88dp"
+            android:scrollbars="none" />
+
+        <ProgressBar
+            android:id="@+id/historyProgress"
+            android:layout_width="36dp"
+            android:layout_height="36dp"
+            android:layout_gravity="center"
+            android:indeterminateTint="?attr/colorPrimary"
+            android:visibility="gone" />
+
+        <LinearLayout
+            android:id="@+id/emptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:padding="32dp"
+            android:visibility="gone">
+
+            <FrameLayout
+                android:layout_width="84dp"
+                android:layout_height="84dp">
+
+                <View
+                    android:layout_width="84dp"
+                    android:layout_height="84dp"
+                    android:background="@drawable/bg_circle_primary" />
+
+                <ImageView
+                    android:layout_width="40dp"
+                    android:layout_height="40dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_history"
+                    app:tint="?attr/colorPrimary" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="18dp"
+                android:text="@string/history_empty_title"
+                android:textAppearance="?attr/textAppearanceTitleMedium"
+                android:textColor="?attr/colorOnSurface" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:gravity="center"
+                android:text="@string/history_empty_subtitle"
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant" />
+        </LinearLayout>
+    </FrameLayout>
+</LinearLayout>

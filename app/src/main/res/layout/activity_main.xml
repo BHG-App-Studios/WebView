@@ -12,57 +12,12 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent">
 
-        <!-- 64dp solid top bar, matching the reference app: the bar is a plain
-             LinearLayout rather than a MaterialToolbar so the icon button, title
-             and padding come out at exactly the same sizes and offsets. -->
-        <com.google.android.material.appbar.AppBarLayout
-            android:id="@+id/appBar"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:background="@drawable/bg_top_bar"
-            android:stateListAnimator="@null"
-            app:elevation="0dp"
-            app:liftOnScroll="false">
-
-            <LinearLayout
-                android:id="@+id/topBar"
-                android:layout_width="match_parent"
-                android:layout_height="@dimen/main_bar_height"
-                android:background="@drawable/bg_top_bar"
-                android:gravity="center_vertical"
-                android:paddingStart="8dp"
-                android:paddingTop="9dp"
-                android:paddingEnd="8dp"
-                android:paddingBottom="9dp">
-
-                <ImageButton
-                    android:id="@+id/topBarMenu"
-                    android:layout_width="40dp"
-                    android:layout_height="40dp"
-                    android:layout_marginEnd="8dp"
-                    android:background="?attr/selectableItemBackgroundBorderless"
-                    android:contentDescription="@string/open_menu"
-                    android:padding="8dp"
-                    android:src="@drawable/ic_menu"
-                    app:tint="@color/top_bar_icon" />
-
-                <TextView
-                    android:id="@+id/topBarTitle"
-                    android:layout_width="0dp"
-                    android:layout_height="wrap_content"
-                    android:layout_weight="1"
-                    android:fontFamily="@font/roboto_bold"
-                    android:textColor="@color/top_bar_title"
-                    android:textSize="@dimen/text_size_20"
-                    android:textStyle="bold" />
-            </LinearLayout>
-        </com.google.android.material.appbar.AppBarLayout>
-
+        <!-- No toolbar here: each fragment owns its own 64dp top bar, exactly like the
+             reference app. The fragment fills the shell and the bottom bar overlays it. -->
         <androidx.fragment.app.FragmentContainerView
             android:id="@+id/fragmentContainer"
             android:layout_width="match_parent"
-            android:layout_height="match_parent"
-            app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+            android:layout_height="match_parent" />
 
         <LinearLayout
             android:id="@+id/bottomNavContainer"

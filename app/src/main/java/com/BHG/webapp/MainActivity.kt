@@ -20,11 +20,13 @@ import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.SetOptions
 
 /**
- * App shell: a 64dp top bar, a start drawer of settings, and a three-tab
- * bottom navigation (Home / History / Profile) hosting fragments.
+ * App shell: a start drawer of settings and a three-tab bottom navigation
+ * (Home / History / Profile) hosting fragments. Each fragment carries its own
+ * 64dp top bar, matching the reference app.
  *
  * The activity owns cross-cutting concerns — the auth guard, profile upkeep,
- * theme switching, and sign-out — while each tab's screen is a [Fragment].
+ * theme switching, drawer access, and sign-out — while each tab's screen is a
+ * [Fragment].
  */
 class MainActivity : AppCompatActivity() {
 
@@ -68,7 +70,6 @@ class MainActivity : AppCompatActivity() {
         setContentView(binding.root)
 
         applyInsets()
-        setupTopBar()
         setupDrawer()
         setupBottomNav()
 
@@ -76,7 +77,6 @@ class MainActivity : AppCompatActivity() {
             selectTab(R.id.nav_home)
         } else {
             currentTab = savedInstanceState.getInt(KEY_TAB, R.id.nav_home)
-            updateTitle(currentTab)
         }
     }
 
@@ -92,18 +92,17 @@ class MainActivity : AppCompatActivity() {
         }
     }
 
-    private fun setupTopBar() {
-        binding.topBarMenu.setOnClickListener {
-            binding.drawerLayout.openDrawer(GravityCompat.START)
-        }
-    }
-
     private fun setupBottomNav() {
         binding.bottomNavigation.setOnItemSelectedListener { item ->
             selectTab(item.itemId)
             true
         }
         binding.bottomNavigation.setOnItemReselectedListener { /* no-op: don't reload */ }
+    }
+
+    /** Opens the drawer. Called from each fragment's own top bar menu button. */
+    fun openDrawer() {
+        binding.drawerLayout.openDrawer(GravityCompat.START)
     }
 
     private fun selectTab(itemId: Int) {
@@ -113,21 +112,10 @@ class MainActivity : AppCompatActivity() {
             else -> HomeFragment()
         }
         currentTab = itemId
-        updateTitle(itemId)
         supportFragmentManager.beginTransaction()
             .setReorderingAllowed(true)
             .replace(R.id.fragmentContainer, fragment)
             .commit()
-    }
-
-    private fun updateTitle(itemId: Int) {
-        binding.topBarTitle.text = getString(
-            when (itemId) {
-                R.id.nav_history -> R.string.title_history
-                R.id.nav_profile -> R.string.title_profile
-                else -> R.string.title_home
-            }
-        )
     }
 
     // ---- Drawer / settings ---------------------------------------------------

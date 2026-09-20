@@ -4,10 +4,12 @@
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:background="@color/home_content_bg"
-    android:orientation="vertical"
-    android:fitsSystemWindows="true">
+    android:clipToPadding="false"
+    android:orientation="vertical">
 
-    <!-- Header -->
+    <!-- Header. The 48dp top padding is what keeps this clear of the status bar: the drawer
+         is a sibling of the inset-padded container, so it never receives system-bar insets
+         itself. This matches the reference app's drawer_panel.xml exactly. -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -15,7 +17,7 @@
         android:gravity="center_vertical"
         android:paddingStart="14dp"
         android:paddingEnd="14dp"
-        android:paddingTop="18dp"
+        android:paddingTop="48dp"
         android:paddingBottom="14dp">
 
         <FrameLayout

@@ -87,6 +87,7 @@ class HomeFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         buildFeatureToggles()
         buildPermissionToggles()
+        binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.buildButton.setOnClickListener { onBuildClicked() }
         binding.downloadButton.setOnClickListener { startDownload() }
     }

@@ -53,6 +53,8 @@ class ProfileFragment : Fragment() {
         binding.profileEmail.text = user.email ?: ""
         binding.profileUid.text = user.uid
 
+        binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
+
         loadAvatar(user.photoUrl?.toString())
         loadStats(user.uid)
 

@@ -167,6 +167,7 @@
             app:iconPadding="14dp"
             app:iconSize="22dp"
             app:iconTint="@null"
+            android:stateListAnimator="@null"
             app:rippleColor="?attr/colorControlHighlight"
             app:strokeColor="@color/google_btn_stroke"
             app:strokeWidth="1dp" />
@@ -176,6 +177,7 @@
             android:layout_width="26dp"
             android:layout_height="26dp"
             android:layout_gravity="center"
+            android:elevation="12dp"
             android:indeterminateTint="@color/google_btn_text"
             android:visibility="gone" />
     </FrameLayout>

@@ -8,8 +8,6 @@ import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
-import android.os.Handler
-import android.os.Looper
 import android.util.Log
 import android.view.View
 import android.view.ViewGroup
@@ -25,6 +23,7 @@ import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
+import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.SetOptions
 import org.json.JSONObject
 
@@ -50,15 +49,12 @@ class MainActivity : AppCompatActivity() {
     private var auth: FirebaseAuth? = null
     private var firestore: FirebaseFirestore? = null
 
-    private val mainHandler = Handler(Looper.getMainLooper())
-
     private var buildInProgress = false
     private var currentBuildId: String? = null
     private var currentDownloadUrl: String? = null
 
-    // Poll state
-    private var pollAttempts = 0
-    private var pollRunnable: Runnable? = null
+    // Live status
+    private var buildListener: ListenerRegistration? = null
 
     // Generated toggle views, keyed by their server option/permission key.
     private val featureSwitches = LinkedHashMap<String, MaterialSwitch>()
@@ -315,7 +311,7 @@ class MainActivity : AppCompatActivity() {
                 if (isFinishing || isDestroyed || buildId != currentBuildId) return@build
                 currentDownloadUrl = result.downloadUrl.ifEmpty { currentDownloadUrl }
                 showStatus(getString(R.string.build_queued), showSpinner = true, showDownload = false)
-                startPolling(buildId)
+                observeBuild(buildId)
             },
             onError = { message ->
                 if (isFinishing || isDestroyed || buildId != currentBuildId) return@build
@@ -366,65 +362,46 @@ class MainActivity : AppCompatActivity() {
         return json
     }
 
-    // ---- Status polling ------------------------------------------------------
+    // ---- Live status via Firestore listener ---------------------------------
 
-    private fun startPolling(buildId: String) {
-        pollAttempts = 0
-        scheduleNextPoll(buildId)
-    }
+    /**
+     * Watches users/{uid}/builds/{buildId} in real time. The Worker flips the
+     * doc to READY (on APK upload) or FAILED (from GitHub Actions on error), so
+     * the UI reacts the instant the build resolves — no polling, no timeout.
+     * The listener simply waits until a terminal status arrives.
+     */
+    private fun observeBuild(buildId: String) {
+        val user = auth?.currentUser ?: return
+        val db = firestore ?: return
 
-    private fun scheduleNextPoll(buildId: String) {
-        cancelPolling()
-        val runnable = Runnable { poll(buildId) }
-        pollRunnable = runnable
-        mainHandler.postDelayed(runnable, POLL_INTERVAL_MS)
-    }
+        detachListener()
 
-    private fun poll(buildId: String) {
-        if (isFinishing || isDestroyed) return
-        if (buildId != currentBuildId) return
-
-        pollAttempts++
-        BuildApi.status(
-            buildId = buildId,
-            onResult = { status ->
-                if (isFinishing || isDestroyed || buildId != currentBuildId) return@status
-                if (status.ready) {
-                    onBuildReady(status.sizeBytes)
-                } else if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-                    onBuildTimeout()
-                } else {
-                    scheduleNextPoll(buildId)
+        buildListener = db.collection("users").document(user.uid)
+            .collection("builds").document(buildId)
+            .addSnapshotListener { snapshot, error ->
+                if (isFinishing || isDestroyed || buildId != currentBuildId) return@addSnapshotListener
+                if (error != null) {
+                    Log.w(TAG, "Build listener error: ${error.message}")
+                    return@addSnapshotListener
                 }
-            },
-            onError = {
-                if (isFinishing || isDestroyed || buildId != currentBuildId) return@status
-                // Transient errors shouldn't abort a build that may still finish.
-                if (pollAttempts >= MAX_POLL_ATTEMPTS) {
-                    onBuildTimeout()
-                } else {
-                    scheduleNextPoll(buildId)
+                val status = snapshot?.getString("status") ?: return@addSnapshotListener
+                when (status) {
+                    "READY" -> {
+                        setBuilding(false)
+                        showStatus(getString(R.string.build_ready), showSpinner = false, showDownload = true)
+                    }
+                    "FAILED", "REJECTED" -> {
+                        setBuilding(false)
+                        showStatus(getString(R.string.build_failed), showSpinner = false, showDownload = false)
+                    }
+                    // "BUILDING" and anything else: keep waiting.
                 }
             }
-        )
     }
 
-    private fun cancelPolling() {
-        pollRunnable?.let { mainHandler.removeCallbacks(it) }
-        pollRunnable = null
-    }
-
-    private fun onBuildReady(sizeBytes: Long) {
-        setBuilding(false)
-        showStatus(getString(R.string.build_ready), showSpinner = false, showDownload = true)
-        updateBuildStatus("READY", sizeBytes)
-    }
-
-    private fun onBuildTimeout() {
-        setBuilding(false)
-        // The build may still complete server-side; the download button lets them retry.
-        showStatus(getString(R.string.build_timeout), showSpinner = false, showDownload = true)
-        updateBuildStatus("TIMEOUT", 0L)
+    private fun detachListener() {
+        buildListener?.remove()
+        buildListener = null
     }
 
     // ---- Firestore -----------------------------------------------------------
@@ -563,13 +540,11 @@ class MainActivity : AppCompatActivity() {
     }
 
     override fun onDestroy() {
-        cancelPolling()
+        detachListener()
         super.onDestroy()
     }
 
     private companion object {
         private const val TAG = "MainActivity"
-        private const val POLL_INTERVAL_MS = 8_000L
-        private const val MAX_POLL_ATTEMPTS = 45 // ~6 minutes at 8s intervals
     }
 }

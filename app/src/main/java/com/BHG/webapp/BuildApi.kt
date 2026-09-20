@@ -79,33 +79,6 @@ object BuildApi {
         }
     }
 
-    /** Status of a build. [ready] is true once the APK is in storage. */
-    data class StatusResult(val buildId: String, val ready: Boolean, val sizeBytes: Long)
-
-    /** Queries GET /api/status/:buildId once. */
-    fun status(
-        buildId: String,
-        onResult: (StatusResult) -> Unit,
-        onError: (String) -> Unit
-    ) {
-        executor.execute {
-            try {
-                val (code, text) = get("$BASE_URL/api/status/$buildId")
-                val json = parse(text)
-                if (code in 200..299 && json != null) {
-                    val ready = json.optString("status") == "READY"
-                    mainHandler.post {
-                        onResult(StatusResult(buildId, ready, json.optLong("size_bytes", 0L)))
-                    }
-                } else {
-                    postError(onError, "Status check failed ($code)")
-                }
-            } catch (e: Exception) {
-                postError(onError, e.message ?: "Network error")
-            }
-        }
-    }
-
     private fun postError(onError: (String) -> Unit, message: String) {
         mainHandler.post { onError(message) }
     }
@@ -122,20 +95,6 @@ object BuildApi {
         }
         return try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
-            conn.code() to conn.readBody()
-        } finally {
-            conn.disconnect()
-        }
-    }
-
-    private fun get(urlString: String): Pair<Int, String> {
-        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
-            requestMethod = "GET"
-            connectTimeout = CONNECT_TIMEOUT_MS
-            readTimeout = READ_TIMEOUT_MS
-            setRequestProperty("Accept", "application/json")
-        }
-        return try {
             conn.code() to conn.readBody()
         } finally {
             conn.disconnect()

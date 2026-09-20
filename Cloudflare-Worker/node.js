@@ -32,6 +32,20 @@ export default {
           return jsonResponse({ error: "Missing required field: 'url'" }, 400, corsHeaders);
         }
 
+        // ---- Security gate --------------------------------------------------
+        // Two independent checks, both must pass:
+        //   1. A valid, unexpired Firebase ID token in the Authorization header
+        //      (proves a real signed-in user; verified against Google's keys).
+        //   2. A build document the caller pre-registered in Firestore under
+        //      their own uid, created less than BUILD_WINDOW_MS ago (read with a
+        //      service account, since the security rules block anonymous reads).
+        // Anything else is rejected before a build is ever dispatched.
+        const authResult = await authorizeBuild(request, body, env);
+        if (authResult.error) {
+          return jsonResponse({ error: authResult.error }, authResult.status || 401, corsHeaders);
+        }
+        const { uid, buildId } = authResult;
+
         let siteUrl;
         try {
           siteUrl = new URL(String(targetUrl));
@@ -45,9 +59,6 @@ export default {
           );
         }
 
-        const timestamp = Date.now();
-        const randomId = Math.random().toString(36).substring(2, 7);
-        const buildId = `app_${timestamp}_${randomId}`;
         const downloadUrl = `${url.origin}/download/${buildId}.apk`;
         const uploadWebhookUrl = `${url.origin}/api/upload/${buildId}`;
 
@@ -104,6 +115,7 @@ export default {
         return jsonResponse({
           success: true,
           build_id: buildId,
+          uid,
           status: ghDispatched ? "BUILDING" : "PENDING_GITHUB_SETUP",
           app_name: appName,
           package_name: packageName,
@@ -535,4 +547,284 @@ async function triggerGitHubAction(env, buildConfig) {
   }
 
   return { success: true };
+}
+// ==========================================================
+// SECURITY: Firebase ID-token verification + Firestore provenance check
+// ==========================================================
+//
+// Required Cloudflare environment / secrets for these to work:
+//   FIREBASE_PROJECT_ID          - e.g. "website-app-builder-xxxx" (plain var)
+//   FIREBASE_SERVICE_ACCOUNT     - the full service-account JSON, as a secret
+//                                  (Project settings > Service accounts >
+//                                   Generate new private key). Must have
+//                                   Firestore read access (Datastore Viewer /
+//                                   Editor, or the Firebase Admin role).
+//
+// If either is unset the gate fails closed: every build is rejected rather
+// than silently unprotected.
+
+// How recent the pre-registered Firestore doc must be. A build request is only
+// honoured within this window of the doc's createdAt.
+const BUILD_WINDOW_MS = 5 * 60 * 1000;         // 5 minutes
+const CLOCK_SKEW_MS = 60 * 1000;               // tolerate 1 min of clock drift
+
+// Accepts the app-generated id format: app_<millis>_<shortrandom>
+const BUILD_ID_RE = /^app_\d{10,16}_[a-z0-9]{3,12}$/;
+
+// Module-scoped caches. Cloudflare may reuse an isolate across requests, so
+// these avoid re-fetching Google's keys / re-minting a token every call.
+let _googleKeysCache = { keys: null, expiresAt: 0 };
+let _saTokenCache = { token: null, expiresAt: 0 };
+
+/**
+ * The full security gate. Returns { uid, buildId } on success, or
+ * { error, status } on any failure.
+ */
+async function authorizeBuild(request, body, env) {
+  if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_SERVICE_ACCOUNT) {
+    // Fail closed: misconfiguration must never mean "open to everyone".
+    return { error: "Server auth not configured", status: 503 };
+  }
+
+  // 1. Bearer token -------------------------------------------------------
+  const authHeader = request.headers.get("Authorization") || "";
+  const match = authHeader.match(/^Bearer\s+(.+)$/i);
+  if (!match) {
+    return { error: "Missing Authorization bearer token", status: 401 };
+  }
+  const idToken = match[1].trim();
+
+  let claims;
+  try {
+    claims = await verifyFirebaseIdToken(idToken, env.FIREBASE_PROJECT_ID);
+  } catch (e) {
+    return { error: `Invalid ID token: ${e.message}`, status: 401 };
+  }
+  const uid = claims.sub;
+  if (!uid) return { error: "Token has no subject", status: 401 };
+
+  // 2. build_id shape -----------------------------------------------------
+  const buildId = String(body.build_id || body.buildId || "").trim();
+  if (!BUILD_ID_RE.test(buildId)) {
+    return { error: "Missing or malformed 'build_id'", status: 400 };
+  }
+
+  // 3. Provenance: the doc must exist under THIS user and be fresh ---------
+  let doc;
+  try {
+    const accessToken = await getServiceAccountToken(env);
+    doc = await fetchBuildDoc(env.FIREBASE_PROJECT_ID, accessToken, uid, buildId);
+  } catch (e) {
+    return { error: `Authorization check failed: ${e.message}`, status: 502 };
+  }
+
+  if (!doc) {
+    return { error: "Build was not registered for this account", status: 403 };
+  }
+
+  const createdAtMs = doc.createdAtMs;
+  if (!Number.isFinite(createdAtMs)) {
+    // No server timestamp yet (write not committed) or missing field.
+    return { error: "Build registration is incomplete. Try again.", status: 403 };
+  }
+
+  const age = Date.now() - createdAtMs;
+  if (age > BUILD_WINDOW_MS + CLOCK_SKEW_MS) {
+    return { error: "Build request expired. Start a new build.", status: 403 };
+  }
+  if (age < -CLOCK_SKEW_MS) {
+    return { error: "Build timestamp is in the future.", status: 403 };
+  }
+
+  return { uid, buildId };
+}
+
+// ----------------------------------------------------------
+// Firebase ID token verification (RS256, Google public keys)
+// ----------------------------------------------------------
+async function verifyFirebaseIdToken(token, projectId) {
+  const parts = token.split(".");
+  if (parts.length !== 3) throw new Error("not a JWT");
+
+  const [headerB64, payloadB64, sigB64] = parts;
+  const header = JSON.parse(utf8(base64urlToBytes(headerB64)));
+  const payload = JSON.parse(utf8(base64urlToBytes(payloadB64)));
+
+  if (header.alg !== "RS256") throw new Error("unexpected alg");
+  if (!header.kid) throw new Error("no kid");
+
+  // Claims
+  const now = Math.floor(Date.now() / 1000);
+  const skew = 60;
+  const issuer = `https://securetoken.google.com/${projectId}`;
+  if (payload.aud !== projectId) throw new Error("aud mismatch");
+  if (payload.iss !== issuer) throw new Error("iss mismatch");
+  if (typeof payload.exp !== "number" || payload.exp < now - skew) throw new Error("expired");
+  if (typeof payload.iat !== "number" || payload.iat > now + skew) throw new Error("iat in future");
+  if (!payload.sub) throw new Error("no sub");
+
+  // Signature
+  const keys = await getGooglePublicKeys();
+  const jwk = keys[header.kid];
+  if (!jwk) throw new Error("unknown signing key");
+
+  const key = await crypto.subtle.importKey(
+    "jwk",
+    jwk,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["verify"]
+  );
+
+  const data = new TextEncoder().encode(`${headerB64}.${payloadB64}`);
+  const signature = base64urlToBytes(sigB64);
+  const ok = await crypto.subtle.verify("RSASSA-PKCS1-v1_5", key, signature, data);
+  if (!ok) throw new Error("bad signature");
+
+  return payload;
+}
+
+/**
+ * Google's Firebase public keys, as a { kid: JWK } map. Cached until the
+ * Cache-Control max-age Google returns.
+ */
+async function getGooglePublicKeys() {
+  if (_googleKeysCache.keys && Date.now() < _googleKeysCache.expiresAt) {
+    return _googleKeysCache.keys;
+  }
+
+  // The JWK Set endpoint returns keys directly in JWK form - no X.509 parsing.
+  const res = await fetch(
+    "https://www.googleapis.com/service_accounts/v1/jwk/securetoken@system.gserviceaccount.com"
+  );
+  if (!res.ok) throw new Error(`key fetch failed (${res.status})`);
+  const body = await res.json();
+
+  const map = {};
+  for (const jwk of body.keys || []) {
+    if (jwk.kid) map[jwk.kid] = jwk;
+  }
+
+  // Respect the endpoint's cache lifetime, default 1 hour.
+  let ttl = 3600;
+  const cc = res.headers.get("Cache-Control") || "";
+  const m = cc.match(/max-age=(\d+)/);
+  if (m) ttl = parseInt(m[1], 10);
+  _googleKeysCache = { keys: map, expiresAt: Date.now() + ttl * 1000 };
+
+  return map;
+}
+
+// ----------------------------------------------------------
+// Service-account OAuth token (for Firestore REST reads)
+// ----------------------------------------------------------
+async function getServiceAccountToken(env) {
+  if (_saTokenCache.token && Date.now() < _saTokenCache.expiresAt) {
+    return _saTokenCache.token;
+  }
+
+  const sa = JSON.parse(env.FIREBASE_SERVICE_ACCOUNT);
+  const now = Math.floor(Date.now() / 1000);
+
+  const jwtHeader = { alg: "RS256", typ: "JWT" };
+  const jwtClaim = {
+    iss: sa.client_email,
+    scope: "https://www.googleapis.com/auth/datastore",
+    aud: "https://oauth2.googleapis.com/token",
+    iat: now,
+    exp: now + 3600
+  };
+
+  const unsigned =
+    `${bytesToBase64url(new TextEncoder().encode(JSON.stringify(jwtHeader)))}.` +
+    `${bytesToBase64url(new TextEncoder().encode(JSON.stringify(jwtClaim)))}`;
+
+  const key = await importPkcs8(sa.private_key);
+  const sigBuf = await crypto.subtle.sign(
+    "RSASSA-PKCS1-v1_5",
+    key,
+    new TextEncoder().encode(unsigned)
+  );
+  const assertion = `${unsigned}.${bytesToBase64url(new Uint8Array(sigBuf))}`;
+
+  const res = await fetch("https://oauth2.googleapis.com/token", {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded" },
+    body: new URLSearchParams({
+      grant_type: "urn:ietf:params:oauth:grant-type:jwt-bearer",
+      assertion
+    })
+  });
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`token exchange failed (${res.status}): ${t}`);
+  }
+  const data = await res.json();
+
+  // Refresh a little before actual expiry.
+  _saTokenCache = {
+    token: data.access_token,
+    expiresAt: Date.now() + (data.expires_in - 60) * 1000
+  };
+  return data.access_token;
+}
+
+/**
+ * Reads users/{uid}/builds/{buildId} via the Firestore REST API.
+ * Returns { createdAtMs } or null when the document does not exist.
+ */
+async function fetchBuildDoc(projectId, accessToken, uid, buildId) {
+  const name = `projects/${projectId}/databases/(default)/documents/users/${encodeURIComponent(uid)}/builds/${encodeURIComponent(buildId)}`;
+  const res = await fetch(`https://firestore.googleapis.com/v1/${name}`, {
+    headers: { Authorization: `Bearer ${accessToken}` }
+  });
+
+  if (res.status === 404) return null;
+  if (!res.ok) throw new Error(`firestore read failed (${res.status})`);
+
+  const doc = await res.json();
+  const fields = doc.fields || {};
+
+  const created = fields.createdAt && fields.createdAt.timestampValue;
+  const createdAtMs = created ? Date.parse(created) : NaN;
+
+  return { createdAtMs };
+}
+
+// ----------------------------------------------------------
+// Encoding helpers (WebCrypto-friendly)
+// ----------------------------------------------------------
+function base64urlToBytes(b64url) {
+  const b64 = b64url.replace(/-/g, "+").replace(/_/g, "/") +
+    "=".repeat((4 - (b64url.length % 4)) % 4);
+  const bin = atob(b64);
+  const bytes = new Uint8Array(bin.length);
+  for (let i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+  return bytes;
+}
+
+function bytesToBase64url(bytes) {
+  let bin = "";
+  for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+  return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+function utf8(bytes) {
+  return new TextDecoder().decode(bytes);
+}
+
+/** Imports a PEM PKCS#8 private key (from the service-account JSON) for signing. */
+async function importPkcs8(pem) {
+  const body = pem
+    .replace(/-----BEGIN PRIVATE KEY-----/, "")
+    .replace(/-----END PRIVATE KEY-----/, "")
+    .replace(/\s+/g, "");
+  const der = base64urlToBytes(body.replace(/\+/g, "-").replace(/\//g, "_"));
+  return crypto.subtle.importKey(
+    "pkcs8",
+    der,
+    { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" },
+    false,
+    ["sign"]
+  );
 }

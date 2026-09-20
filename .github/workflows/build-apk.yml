@@ -122,3 +122,21 @@ jobs:
             echo "::error::APK upload failed with HTTP $HTTP_CODE"
             exit 1
           fi
+
+      # Runs only if any earlier step failed (customise, build, or upload).
+      # Reports FAILED to the Worker so the app's Firestore listener stops
+      # waiting and shows an error instead of spinning forever.
+      - name: Report build failure
+        if: failure()
+        env:
+          STATUS_WEBHOOK: ${{ github.event.client_payload.status_webhook_url }}
+          BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
+        run: |
+          if [ -z "$STATUS_WEBHOOK" ]; then
+            echo "status_webhook_url missing; nothing to report"
+            exit 0
+          fi
+          curl -s -X POST "$STATUS_WEBHOOK" \
+            -H "X-Build-Secret: $BUILD_SECRET" \
+            -H "Content-Type: application/json" \
+            -d '{"status":"FAILED"}' || true

@@ -60,7 +60,11 @@ export default {
         }
 
         const downloadUrl = `${url.origin}/download/${buildId}.apk`;
-        const uploadWebhookUrl = `${url.origin}/api/upload/${buildId}`;
+        // uid rides along so the upload/report handlers can update the correct
+        // Firestore doc (users/{uid}/builds/{buildId}) when the build finishes.
+        const uidParam = encodeURIComponent(uid);
+        const uploadWebhookUrl = `${url.origin}/api/upload/${buildId}?uid=${uidParam}`;
+        const statusWebhookUrl = `${url.origin}/api/report/${buildId}?uid=${uidParam}`;
 
         // Customisation: app name + package name
         const appName = normalizeAppName(body.app_name, siteUrl.hostname);
@@ -95,7 +99,8 @@ export default {
           PACKAGE_NAME: packageName,
           CONSTANTS: constants,
           REMOVE_PERMISSIONS: removal.permissions,
-          UPLOAD_WEBHOOK_URL: uploadWebhookUrl
+          UPLOAD_WEBHOOK_URL: uploadWebhookUrl,
+          STATUS_WEBHOOK_URL: statusWebhookUrl
         };
 
         let ghDispatched = false;
@@ -149,7 +154,7 @@ export default {
         const objectKey = `apks/${buildId}.apk`;
 
         // Stream body straight into R2 storage
-        await env.BUCKET.put(objectKey, request.body, {
+        const putResult = await env.BUCKET.put(objectKey, request.body, {
           httpMetadata: {
             contentType: "application/vnd.android.package-archive",
             contentDisposition: `attachment; filename="${buildId}.apk"`
@@ -159,6 +164,22 @@ export default {
           }
         });
 
+        // Flip the Firestore doc to READY so the app's live listener reacts
+        // instantly. Best-effort: a failure here must not fail the upload (the
+        // APK is already stored and the app can still poll as a fallback).
+        const uid = url.searchParams.get("uid");
+        if (uid) {
+          try {
+            await updateBuildDoc(env, uid, buildId, {
+              status: "READY",
+              sizeBytes: putResult && putResult.size ? putResult.size : 0,
+              downloadUrl: `${url.origin}/download/${buildId}.apk`
+            });
+          } catch (e) {
+            console.log(`Firestore READY update failed for ${buildId}: ${e.message}`);
+          }
+        }
+
         return jsonResponse({
           success: true,
           message: "APK stored in R2 successfully",
@@ -166,6 +187,39 @@ export default {
           object_key: objectKey,
           download_url: `${url.origin}/download/${buildId}.apk`
         }, 200, corsHeaders);
+      }
+
+      // ----------------------------------------------------
+      // 2b. REPORT BUILD STATUS (e.g. FAILED) FROM GITHUB ACTIONS:
+      //     POST /api/report/:buildId?uid=...
+      // ----------------------------------------------------
+      if (method === "POST" && path.startsWith("/api/report/")) {
+        const authKey = request.headers.get("X-Build-Secret") || url.searchParams.get("secret");
+        if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
+          return jsonResponse({ error: "Unauthorized report" }, 401, corsHeaders);
+        }
+
+        let buildId = path.replace("/api/report/", "").trim();
+        if (buildId.endsWith(".apk")) buildId = buildId.replace(".apk", "");
+
+        const uid = url.searchParams.get("uid");
+        const reportBody = await request.json().catch(() => ({}));
+        // Only a small, known set of statuses may be written this way.
+        const allowed = new Set(["FAILED", "READY", "BUILDING"]);
+        const status = String(reportBody.status || "").toUpperCase();
+        if (!allowed.has(status)) {
+          return jsonResponse({ error: "Invalid status" }, 400, corsHeaders);
+        }
+
+        if (uid) {
+          try {
+            await updateBuildDoc(env, uid, buildId, { status });
+          } catch (e) {
+            return jsonResponse({ error: `Firestore update failed: ${e.message}` }, 502, corsHeaders);
+          }
+        }
+
+        return jsonResponse({ success: true, build_id: buildId, status }, 200, corsHeaders);
       }
 
       // ----------------------------------------------------
@@ -536,7 +590,8 @@ async function triggerGitHubAction(env, buildConfig) {
         package_name: buildConfig.PACKAGE_NAME,
         constants: buildConfig.CONSTANTS,
         remove_permissions: buildConfig.REMOVE_PERMISSIONS,
-        upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL
+        upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL,
+        status_webhook_url: buildConfig.STATUS_WEBHOOK_URL
       }
     })
   });
@@ -789,6 +844,55 @@ async function fetchBuildDoc(projectId, accessToken, uid, buildId) {
   const createdAtMs = created ? Date.parse(created) : NaN;
 
   return { createdAtMs };
+}
+
+/**
+ * Patches selected fields on users/{uid}/builds/{buildId} via the Firestore
+ * REST API, using the service account. Only the given fields are touched
+ * (updateMask), so it never disturbs the config the app wrote. Always stamps
+ * updatedAt.
+ */
+async function updateBuildDoc(env, uid, buildId, changes) {
+  const accessToken = await getServiceAccountToken(env);
+  const name = `projects/${env.FIREBASE_PROJECT_ID}/databases/(default)/documents/users/${encodeURIComponent(uid)}/builds/${encodeURIComponent(buildId)}`;
+
+  const all = { ...changes, updatedAt: new Date().toISOString() };
+  const fields = {};
+  const maskFields = [];
+
+  for (const [key, value] of Object.entries(all)) {
+    fields[key] = toFirestoreValue(key, value);
+    maskFields.push(key);
+  }
+
+  const params = maskFields.map((f) => `updateMask.fieldPaths=${encodeURIComponent(f)}`).join("&");
+  const res = await fetch(`https://firestore.googleapis.com/v1/${name}?${params}`, {
+    method: "PATCH",
+    headers: {
+      Authorization: `Bearer ${accessToken}`,
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({ fields })
+  });
+
+  if (!res.ok) {
+    const t = await res.text();
+    throw new Error(`firestore patch failed (${res.status}): ${t}`);
+  }
+}
+
+/** Maps a JS value to a typed Firestore REST value. updatedAt -> timestamp. */
+function toFirestoreValue(key, value) {
+  if (key === "updatedAt" && typeof value === "string") {
+    return { timestampValue: value };
+  }
+  if (typeof value === "boolean") return { booleanValue: value };
+  if (typeof value === "number") {
+    return Number.isInteger(value)
+      ? { integerValue: String(value) }
+      : { doubleValue: value };
+  }
+  return { stringValue: String(value) };
 }
 
 // ----------------------------------------------------------

@@ -117,15 +117,17 @@
     </style>
 
     <style name="BottomNav.ActiveText" parent="TextAppearance.Material3.LabelMedium">
-        <item name="fontFamily">@font/roboto_semibold</item>
-        <item name="android:textSize">11sp</item>
+        <item name="fontFamily">@font/roboto_bold</item>
+        <item name="android:textSize">13sp</item>
     </style>
     <style name="BottomNav.InactiveText" parent="TextAppearance.Material3.LabelMedium">
-        <item name="fontFamily">@font/roboto_medium</item>
-        <item name="android:textSize">11sp</item>
+        <item name="fontFamily">@font/roboto_regular</item>
+        <item name="android:textSize">13sp</item>
     </style>
     <style name="App.ActiveIndicator" parent="Widget.Material3.BottomNavigationView.ActiveIndicator">
         <item name="android:color">@color/primary_container</item>
+        <item name="android:width">54dp</item>
+        <item name="android:height">32dp</item>
     </style>
 
     <style name="CircleImage">

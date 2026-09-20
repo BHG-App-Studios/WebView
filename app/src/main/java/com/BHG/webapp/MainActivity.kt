@@ -79,12 +79,14 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyInsets() {
+        val navBasePadding = resources.getDimensionPixelSize(R.dimen.bottom_nav_padding_bottom)
         ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
             binding.appBar.updatePadding(top = bars.top)
-            binding.bottomNavigation.updatePadding(bottom = bars.bottom)
+            // Keep the bar's own bottom padding and add the system nav inset on top.
+            binding.bottomNavigation.updatePadding(bottom = bars.bottom + navBasePadding)
             insets
         }
     }

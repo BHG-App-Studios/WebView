@@ -28,6 +28,9 @@
     <color name="error_container">#3A1A1A</color>
     <color name="warning">#FBBF24</color>
 
+    <!-- Bottom navigation bar background (slightly lifted from #121212 bg) -->
+    <color name="nav_bar_bg">#242424</color>
+
     <!-- Scrim -->
     <color name="scrim">#99000000</color>
 </resources>

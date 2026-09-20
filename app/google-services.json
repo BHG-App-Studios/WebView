@@ -1,0 +1,39 @@
+{
+  "project_info": {
+    "project_number": "571670085797",
+    "project_id": "bhg-website-app-builder",
+    "storage_bucket": "bhg-website-app-builder.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:571670085797:android:13b589b65bad3a934ccd4c",
+        "android_client_info": {
+          "package_name": "com.BHG.webapp"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "571670085797-vp3n8s33u84orsb8639i04mh896brcab.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyCaJQcH3eE65DhuI_e9x5ONWERDOfMaq58"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "571670085797-vp3n8s33u84orsb8639i04mh896brcab.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

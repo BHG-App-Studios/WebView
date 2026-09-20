@@ -9,8 +9,7 @@
     <androidx.coordinatorlayout.widget.CoordinatorLayout
         android:id="@+id/mainContainer"
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="?android:attr/colorBackground">
+        android:layout_height="match_parent">
 
         <com.google.android.material.appbar.AppBarLayout
             android:id="@+id/appBar"
@@ -35,22 +34,38 @@
             android:layout_height="match_parent"
             app:layout_behavior="@string/appbar_scrolling_view_behavior" />
 
-        <com.google.android.material.bottomnavigation.BottomNavigationView
-            android:id="@+id/bottomNavigation"
+        <LinearLayout
+            android:id="@+id/bottomNavContainer"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_gravity="bottom"
-            android:background="@drawable/bg_bottom_bar"
-            android:paddingTop="@dimen/bottom_nav_padding_top"
-            app:elevation="12dp"
-            app:labelVisibilityMode="labeled"
-            app:menu="@menu/bottom_nav_menu"
-            app:itemIconSize="@dimen/bottom_nav_icon_size"
-            app:itemIconTint="@color/nav_item_tint"
-            app:itemTextColor="@color/nav_item_tint"
-            app:itemActiveIndicatorStyle="@style/App.ActiveIndicator"
-            app:itemTextAppearanceActive="@style/BottomNav.ActiveText"
-            app:itemTextAppearanceInactive="@style/BottomNav.InactiveText" />
+            android:orientation="vertical">
+
+            <View
+                android:id="@+id/bottomNavigationShadow"
+                android:layout_width="match_parent"
+                android:layout_height="3dp"
+                android:alpha=".5"
+                android:background="@drawable/shadow_top" />
+
+            <com.google.android.material.bottomnavigation.BottomNavigationView
+                android:id="@+id/bottomNavigation"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:background="@drawable/bg_bottom_bar"
+                android:elevation="0dp"
+                android:paddingTop="@dimen/bottom_nav_padding_top"
+                android:paddingBottom="@dimen/bottom_nav_padding_bottom"
+                app:labelVisibilityMode="labeled"
+                app:menu="@menu/bottom_nav_menu"
+                app:itemIconSize="@dimen/bottom_nav_icon_size"
+                app:itemIconTint="@color/nav_item_tint"
+                app:itemTextColor="@color/nav_item_tint"
+                app:itemActiveIndicatorStyle="@style/App.ActiveIndicator"
+                app:itemTextAppearanceActive="@style/BottomNav.ActiveText"
+                app:itemTextAppearanceInactive="@style/BottomNav.InactiveText" />
+
+        </LinearLayout>
 
     </androidx.coordinatorlayout.widget.CoordinatorLayout>
 

@@ -30,6 +30,8 @@
 
     <!-- Bottom navigation bar background (slightly lifted from #121212 bg) -->
     <color name="nav_bar_bg">#242424</color>
+    <color name="status_bar_bg">#1a1818</color>
+    <color name="navigation_bar_bg">#191617</color>
 
     <!-- Google sign-in button: dark surface with light text in dark mode -->
     <color name="google_btn_bg">#1E1E1E</color>

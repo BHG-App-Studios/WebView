@@ -34,6 +34,8 @@
 
     <!-- Bottom navigation bar background -->
     <color name="nav_bar_bg">#FFFFFF</color>
+    <color name="status_bar_bg">#FFFFFF</color>
+    <color name="navigation_bar_bg">#FFFFFF</color>
 
     <!-- Google sign-in button -->
     <color name="google_btn_bg">#FFFFFF</color>

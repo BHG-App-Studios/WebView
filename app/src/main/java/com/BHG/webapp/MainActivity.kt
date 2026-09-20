@@ -65,6 +65,9 @@ class MainActivity : AppCompatActivity() {
         binding = ActivityMainBinding.inflate(layoutInflater)
         setContentView(binding.root)
 
+        window.statusBarColor = getColor(R.color.status_bar_bg)
+        window.navigationBarColor = getColor(R.color.navigation_bar_bg)
+
         applyInsets()
         setupToolbar()
         setupDrawer()
@@ -79,15 +82,16 @@ class MainActivity : AppCompatActivity() {
     }
 
     private fun applyInsets() {
-        val navBasePadding = resources.getDimensionPixelSize(R.dimen.bottom_nav_padding_bottom)
-        ViewCompat.setOnApplyWindowInsetsListener(binding.root) { _, insets ->
+        // Pad the whole content area by the system bars and consume the insets, exactly
+        // like the reference app. This lifts the bottom bar above the system nav bar so it
+        // keeps its compact 2dp/11dp height; the system nav strip itself is painted by
+        // window.navigationBarColor, which matches the bar background.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.mainContainer) { v, insets ->
             val bars = insets.getInsets(
                 WindowInsetsCompat.Type.systemBars() or WindowInsetsCompat.Type.displayCutout()
             )
-            binding.appBar.updatePadding(top = bars.top)
-            // Keep the bar's own bottom padding and add the system nav inset on top.
-            binding.bottomNavigation.updatePadding(bottom = bars.bottom + navBasePadding)
-            insets
+            v.setPadding(bars.left, bars.top, bars.right, bars.bottom)
+            WindowInsetsCompat.CONSUMED
         }
     }
 

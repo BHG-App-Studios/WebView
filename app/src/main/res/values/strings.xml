@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">Website App Builder</string>
+    <string name="app_name">WebCraft: Website to APK &amp; AAB</string>
 
     <!-- Auth -->
     <string name="auth_subtitle">Sign in with your Google account to continue</string>

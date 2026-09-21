@@ -99,5 +99,249 @@
                 android:imeOptions="actionDone" />
         </com.google.android.material.textfield.TextInputLayout>
 
+        <!-- ================= Build type ================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_build_type"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="@font/roboto_semibold"
+            android:layout_marginTop="28dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/buildTypeToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buildTypeDebug"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/build_type_debug" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/buildTypeRelease"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/build_type_release" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/buildTypeHelper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/build_type_debug_helper"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginTop="6dp" />
+
+        <!-- ============ Output format (release only) ============ -->
+        <LinearLayout
+            android:id="@+id/outputFormatSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:text="@string/label_output_format"
+                android:textAppearance="?attr/textAppearanceTitleSmall"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="@font/roboto_semibold"
+                android:layout_marginTop="20dp"
+                android:layout_marginBottom="8dp" />
+
+            <com.google.android.material.button.MaterialButtonToggleGroup
+                android:id="@+id/outputToggle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                app:singleSelection="true"
+                app:selectionRequired="true">
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/outputApk"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/output_apk" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/outputAab"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/output_aab" />
+
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/outputBoth"
+                    style="?attr/materialButtonOutlinedStyle"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/output_both" />
+            </com.google.android.material.button.MaterialButtonToggleGroup>
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/output_format_helper"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:layout_marginTop="6dp" />
+        </LinearLayout>
+
+        <!-- ================= Signing ================= -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="@string/label_signing"
+            android:textAppearance="?attr/textAppearanceTitleSmall"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="@font/roboto_semibold"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp" />
+
+        <com.google.android.material.button.MaterialButtonToggleGroup
+            android:id="@+id/signingToggle"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            app:singleSelection="true"
+            app:selectionRequired="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/signingAuto"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/signing_auto" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/signingCustom"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="0dp"
+                android:layout_weight="1"
+                android:layout_height="wrap_content"
+                android:text="@string/signing_custom" />
+        </com.google.android.material.button.MaterialButtonToggleGroup>
+
+        <TextView
+            android:id="@+id/signingHelper"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="@string/signing_auto_helper"
+            android:textAppearance="?attr/textAppearanceBodySmall"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginTop="6dp" />
+
+        <!-- ========== Custom keystore fields (custom signing only) ========== -->
+        <LinearLayout
+            android:id="@+id/customKeystoreSection"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical"
+            android:visibility="gone">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/pickKeystoreButton"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                app:icon="@drawable/ic_arrow_forward"
+                android:text="@string/keystore_pick" />
+
+            <TextView
+                android:id="@+id/keystoreFileName"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:layout_marginTop="6dp"
+                android:visibility="gone" />
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/storePwLayout"
+                style="@style/Widget.App.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                app:passwordToggleEnabled="true"
+                android:hint="@string/keystore_store_password">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/storePwInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/keyAliasLayout"
+                style="@style/Widget.App.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                android:hint="@string/keystore_key_alias">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/keyAliasInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto"
+                    android:inputType="text"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.textfield.TextInputLayout
+                android:id="@+id/keyPwLayout"
+                style="@style/Widget.App.TextField"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="14dp"
+                app:passwordToggleEnabled="true"
+                app:helperTextEnabled="true"
+                app:helperText="@string/keystore_key_password_helper"
+                android:hint="@string/keystore_key_password">
+
+                <com.google.android.material.textfield.TextInputEditText
+                    android:id="@+id/keyPwInput"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:fontFamily="@font/roboto"
+                    android:inputType="textPassword"
+                    android:maxLines="1" />
+            </com.google.android.material.textfield.TextInputLayout>
+
+            <com.google.android.material.checkbox.MaterialCheckBox
+                android:id="@+id/rememberKeystoreCheckbox"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="@string/keystore_remember" />
+
+            <TextView
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:text="@string/keystore_remember_helper"
+                android:textAppearance="?attr/textAppearanceBodySmall"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:layout_marginStart="4dp" />
+        </LinearLayout>
+
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

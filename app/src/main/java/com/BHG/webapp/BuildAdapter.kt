@@ -17,7 +17,11 @@ data class BuildItem(
     val url: String,
     val status: String,
     val downloadUrl: String,
-    val createdAtMs: Long
+    val createdAtMs: Long,
+    // Release/signing extras. Empty/false when not applicable.
+    val aabDownloadUrl: String = "",
+    val keystoreAvailable: Boolean = false,
+    val keystoreDownloadUrl: String = ""
 )
 
 /**
@@ -26,7 +30,9 @@ data class BuildItem(
  * updates animate in place.
  */
 class BuildAdapter(
-    private val onDownload: (BuildItem) -> Unit
+    private val onDownload: (BuildItem) -> Unit,
+    private val onDownloadAab: (BuildItem) -> Unit = {},
+    private val onDownloadKeystore: (BuildItem) -> Unit = {}
 ) : ListAdapter<BuildItem, BuildAdapter.VH>(DIFF) {
 
     inner class VH(val binding: ItemBuildBinding) : RecyclerView.ViewHolder(binding.root)
@@ -56,9 +62,22 @@ class BuildAdapter(
         b.itemStatus.setTextColor(androidx.core.content.ContextCompat.getColor(ctx, colorAttr))
 
         val ready = item.status == "READY"
-        b.itemDownload.isEnabled = ready
-        b.itemDownload.alpha = if (ready) 1f else 0.35f
-        b.itemDownload.setOnClickListener { if (ready) onDownload(item) }
+        // Primary APK button is active only when an APK exists. AAB-only release
+        // builds have no APK, so dim it when there's no APK download URL.
+        val hasApk = item.downloadUrl.isNotEmpty()
+        b.itemDownload.isEnabled = ready && hasApk
+        b.itemDownload.alpha = if (ready && hasApk) 1f else 0.35f
+        b.itemDownload.setOnClickListener { if (ready && hasApk) onDownload(item) }
+
+        // AAB download — shown only when the build produced one.
+        val showAab = ready && item.aabDownloadUrl.isNotEmpty()
+        b.itemDownloadAab.visibility = if (showAab) android.view.View.VISIBLE else android.view.View.GONE
+        b.itemDownloadAab.setOnClickListener { if (showAab) onDownloadAab(item) }
+
+        // Keystore download — shown only for auto-signed builds with a stored key.
+        val showKeystore = ready && item.keystoreAvailable && item.keystoreDownloadUrl.isNotEmpty()
+        b.itemDownloadKeystore.visibility = if (showKeystore) android.view.View.VISIBLE else android.view.View.GONE
+        b.itemDownloadKeystore.setOnClickListener { if (showKeystore) onDownloadKeystore(item) }
     }
 
     private companion object {

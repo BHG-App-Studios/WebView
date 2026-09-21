@@ -85,12 +85,44 @@
                     android:textAppearance="?attr/textAppearanceBodySmall"
                     android:textColor="?attr/colorOnSurfaceVariant" />
             </LinearLayout>
+
+            <!-- Secondary downloads (AAB / keystore) — shown only when present. -->
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/itemDownloadAab"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:minHeight="0dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:textSize="12sp"
+                app:icon="@drawable/ic_download"
+                app:iconSize="16dp"
+                android:text="@string/download_aab"
+                android:visibility="gone" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/itemDownloadKeystore"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="6dp"
+                android:minHeight="0dp"
+                android:paddingTop="4dp"
+                android:paddingBottom="4dp"
+                android:textSize="12sp"
+                app:icon="@drawable/ic_download"
+                app:iconSize="16dp"
+                android:text="@string/download_keystore"
+                android:visibility="gone" />
         </LinearLayout>
 
         <ImageButton
             android:id="@+id/itemDownload"
             android:layout_width="42dp"
             android:layout_height="42dp"
+            android:layout_gravity="top"
             android:background="?attr/selectableItemBackgroundBorderless"
             android:contentDescription="@string/download_apk"
             android:src="@drawable/ic_download"

@@ -6,6 +6,7 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
 import android.os.Bundle
+import android.util.Base64
 import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
@@ -13,6 +14,8 @@ import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
+import androidx.activity.result.ActivityResultLauncher
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
@@ -63,6 +66,23 @@ class HomeFragment : Fragment() {
     // ── Build state ───────────────────────────────────────────────────────────
     private var buildDispatching = false
 
+    // ── Signing state ─────────────────────────────────────────────────────────
+    // buildType: "debug" | "release";  signingMode: "auto" | "custom"
+    private var buildType = "debug"
+    private var signingMode = "auto"
+    // "apk" | "aab" | "both" — only meaningful for release builds.
+    private var outputFormat = "apk"
+    /** Base64 of the user-picked custom keystore, and its display name. */
+    private var customKeystoreB64: String? = null
+    private var customKeystoreName: String? = null
+
+    private val keystorePrefs: KeystorePrefs? by lazy {
+        runCatching { KeystorePrefs(requireContext()) }.getOrNull()
+    }
+
+    /** SAF picker for the custom keystore file. */
+    private lateinit var keystorePicker: ActivityResultLauncher<Array<String>>
+
     // ── Toggle data ───────────────────────────────────────────────────────────
     private val featureSwitches    = LinkedHashMap<String, MaterialSwitch>()
     private val permissionSwitches = LinkedHashMap<String, MaterialSwitch>()
@@ -105,6 +125,15 @@ class HomeFragment : Fragment() {
     // =========================================================================
     //  Lifecycle
     // =========================================================================
+
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        // Register the keystore file picker here (before STARTED, as required by
+        // the Activity Result API). Accepts any file; we validate the bytes on read.
+        keystorePicker = registerForActivityResult(
+            ActivityResultContracts.OpenDocument()
+        ) { uri -> if (uri != null) onKeystorePicked(uri) }
+    }
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -234,6 +263,7 @@ class HomeFragment : Fragment() {
                 STEP_WEBSITE -> {
                     val b = StepWebsiteBinding.inflate(inf, parent, false)
                     stepWebsiteBinding = b
+                    setupSigningControls(b)
                     StepVH(b.root)
                 }
                 STEP_FEATURES -> {
@@ -282,6 +312,90 @@ class HomeFragment : Fragment() {
             b.permissionContainer.addView(sw)
         }
     }
+
+    // =========================================================================
+    //  Signing controls (build type / output / keystore)
+    // =========================================================================
+
+    private fun setupSigningControls(b: StepWebsiteBinding) {
+        // Defaults: debug + auto + apk.
+        b.buildTypeToggle.check(b.buildTypeDebug.id)
+        b.signingToggle.check(b.signingAuto.id)
+        b.outputToggle.check(b.outputApk.id)
+
+        b.buildTypeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            buildType = if (checkedId == b.buildTypeRelease.id) "release" else "debug"
+            // Output format only applies to release builds.
+            b.outputFormatSection.visibility =
+                if (buildType == "release") View.VISIBLE else View.GONE
+            b.buildTypeHelper.setText(
+                if (buildType == "release") R.string.build_type_release_helper
+                else R.string.build_type_debug_helper
+            )
+        }
+
+        b.outputToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            outputFormat = when (checkedId) {
+                b.outputAab.id  -> "aab"
+                b.outputBoth.id -> "both"
+                else            -> "apk"
+            }
+        }
+
+        b.signingToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
+            if (!isChecked) return@addOnButtonCheckedListener
+            signingMode = if (checkedId == b.signingCustom.id) "custom" else "auto"
+            val custom = signingMode == "custom"
+            b.customKeystoreSection.visibility = if (custom) View.VISIBLE else View.GONE
+            b.signingHelper.setText(
+                if (custom) R.string.signing_custom_helper else R.string.signing_auto_helper
+            )
+            if (custom) prefillRememberedCredentials(b)
+        }
+
+        b.pickKeystoreButton.setOnClickListener {
+            // Common keystore MIME types are unreliable; accept everything and
+            // validate on read.
+            keystorePicker.launch(arrayOf("*/*"))
+        }
+    }
+
+    /** If the user previously chose "remember", pre-fill the password fields. */
+    private fun prefillRememberedCredentials(b: StepWebsiteBinding) {
+        val creds = keystorePrefs?.load() ?: return
+        if (b.storePwInput.text.isNullOrEmpty()) b.storePwInput.setText(creds.storePassword)
+        if (b.keyAliasInput.text.isNullOrEmpty()) b.keyAliasInput.setText(creds.keyAlias)
+        if (b.keyPwInput.text.isNullOrEmpty()) b.keyPwInput.setText(creds.keyPassword)
+        b.rememberKeystoreCheckbox.isChecked = true
+    }
+
+    /** Reads the picked keystore into base64 and shows its name. */
+    private fun onKeystorePicked(uri: Uri) {
+        val b = stepWebsiteBinding ?: return
+        try {
+            val bytes = requireContext().contentResolver.openInputStream(uri)?.use { it.readBytes() }
+                ?: throw IllegalStateException("empty stream")
+            if (bytes.isEmpty()) throw IllegalStateException("empty file")
+            customKeystoreB64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
+            customKeystoreName = queryDisplayName(uri) ?: "keystore"
+            b.keystoreFileName.visibility = View.VISIBLE
+            b.keystoreFileName.text = getString(R.string.keystore_selected, customKeystoreName)
+        } catch (e: Exception) {
+            Log.w(TAG, "keystore read failed: ${e.message}")
+            customKeystoreB64 = null
+            customKeystoreName = null
+            toast(R.string.keystore_read_failed)
+        }
+    }
+
+    private fun queryDisplayName(uri: Uri): String? = runCatching {
+        requireContext().contentResolver.query(uri, null, null, null, null)?.use { c ->
+            val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
+            if (idx >= 0 && c.moveToFirst()) c.getString(idx) else null
+        }
+    }.getOrNull()
 
     private fun makeSwitch(label: String, checked: Boolean) = MaterialSwitch(requireContext()).apply {
         text = label; isChecked = checked; textSize = 15f
@@ -399,6 +513,31 @@ class HomeFragment : Fragment() {
             return
         }
 
+        // Custom signing requires a keystore file + credentials. Validate before
+        // dispatch and send the user back to the details step if incomplete.
+        if (signingMode == "custom") {
+            if (customKeystoreB64 == null) {
+                toast(R.string.keystore_required)
+                goToStep(STEP_WEBSITE)
+                return
+            }
+            val storePw = stepWebsiteBinding?.storePwInput?.text?.toString().orEmpty()
+            val keyAlias = stepWebsiteBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty()
+            if (storePw.isEmpty() || keyAlias.isEmpty()) {
+                toast(R.string.keystore_fields_required)
+                goToStep(STEP_WEBSITE)
+                return
+            }
+            // Persist or forget the credentials per the "remember" checkbox.
+            val remember = stepWebsiteBinding?.rememberKeystoreCheckbox?.isChecked == true
+            val keyPw = stepWebsiteBinding?.keyPwInput?.text?.toString().orEmpty().ifEmpty { storePw }
+            if (remember) {
+                keystorePrefs?.save(KeystorePrefs.Credentials(storePw, keyAlias, keyPw))
+            } else {
+                keystorePrefs?.clear()
+            }
+        }
+
         val user = auth?.currentUser ?: return
         buildDispatching = true
         stepPermissionsBinding?.buildButton?.isEnabled = false
@@ -428,6 +567,15 @@ class HomeFragment : Fragment() {
             "downloadUrl"       to downloadUrl,
             "status"            to "BUILDING",
             "sizeBytes"         to 0L,
+            // Non-secret build metadata so History renders the right actions.
+            "buildType"         to buildType,
+            "outputs"           to if (buildType == "release") when (outputFormat) {
+                                        "aab"  -> listOf("aab")
+                                        "both" -> listOf("apk", "aab")
+                                        else   -> listOf("apk")
+                                    } else listOf("apk"),
+            "signingMode"       to signingMode,
+            "keystoreAvailable" to false,
             "createdAt"         to FieldValue.serverTimestamp()
         )
 
@@ -473,6 +621,28 @@ class HomeFragment : Fragment() {
         val toRemove = LinkedHashSet<String>()
         for (opt in permissionOptions) if (permissionSwitches[opt.key]?.isChecked == false) toRemove.addAll(opt.removeKeywords)
         if (toRemove.isNotEmpty()) json.put("remove_permissions", BuildApi.jsonArrayOf(toRemove))
+
+        // Build type / output / signing.
+        json.put("build_type", buildType)
+        if (buildType == "release") {
+            // Map the UI choice to the Worker's outputs array.
+            val outputs = when (outputFormat) {
+                "aab"  -> listOf("aab")
+                "both" -> listOf("apk", "aab")
+                else   -> listOf("apk")
+            }
+            json.put("outputs", BuildApi.jsonArrayOf(outputs))
+        }
+        json.put("signing_mode", signingMode)
+        if (signingMode == "custom") {
+            // Keystore bytes + passwords travel to the Worker over HTTPS only;
+            // they are never written to Firestore.
+            json.put("keystore_b64", customKeystoreB64)
+            json.put("store_password", stepWebsiteBinding?.storePwInput?.text?.toString().orEmpty())
+            json.put("key_alias", stepWebsiteBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty())
+            val keyPw = stepWebsiteBinding?.keyPwInput?.text?.toString().orEmpty()
+            if (keyPw.isNotEmpty()) json.put("key_password", keyPw)
+        }
         return json
     }
 
@@ -492,6 +662,19 @@ class HomeFragment : Fragment() {
         stepEntryBinding?.entryUrlInput?.text?.clear()
         stepWebsiteBinding?.appNameInput?.text?.clear()
         stepWebsiteBinding?.packageInput?.text?.clear()
+        // Reset signing selections back to the defaults for the next build.
+        buildType = "debug"; signingMode = "auto"; outputFormat = "apk"
+        customKeystoreB64 = null; customKeystoreName = null
+        stepWebsiteBinding?.let { b ->
+            b.buildTypeToggle.check(b.buildTypeDebug.id)
+            b.signingToggle.check(b.signingAuto.id)
+            b.outputToggle.check(b.outputApk.id)
+            b.outputFormatSection.visibility = View.GONE
+            b.customKeystoreSection.visibility = View.GONE
+            b.keystoreFileName.visibility = View.GONE
+            b.storePwInput.text?.clear(); b.keyAliasInput.text?.clear(); b.keyPwInput.text?.clear()
+            b.rememberKeystoreCheckbox.isChecked = false
+        }
         (activity as? MainActivity)?.setBottomNavVisible(true, animate = false)
     }
 

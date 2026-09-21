@@ -45,7 +45,11 @@ class HistoryFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        adapter = BuildAdapter(onDownload = ::download)
+        adapter = BuildAdapter(
+            onDownload = ::download,
+            onDownloadAab = ::downloadAab,
+            onDownloadKeystore = ::downloadKeystore
+        )
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
         binding.historyList.adapter = adapter
@@ -78,7 +82,10 @@ class HistoryFragment : Fragment() {
                         url = doc.getString("url") ?: "",
                         status = doc.getString("status") ?: "BUILDING",
                         downloadUrl = doc.getString("downloadUrl") ?: "",
-                        createdAtMs = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L
+                        createdAtMs = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
+                        aabDownloadUrl = doc.getString("aabDownloadUrl") ?: "",
+                        keystoreAvailable = doc.getBoolean("keystoreAvailable") ?: false,
+                        keystoreDownloadUrl = doc.getString("keystoreDownloadUrl") ?: ""
                     )
                 }.orEmpty()
 
@@ -93,27 +100,67 @@ class HistoryFragment : Fragment() {
         binding.historyList.visibility = if (empty) View.GONE else View.VISIBLE
     }
 
-    private fun download(item: BuildItem) {
-        if (item.downloadUrl.isEmpty()) return
-        val uri = Uri.parse(item.downloadUrl)
+    private fun download(item: BuildItem) = enqueuePublic(
+        item.downloadUrl, "application/vnd.android.package-archive", null
+    )
+
+    /** AAB is a public download like the APK. */
+    private fun downloadAab(item: BuildItem) = enqueuePublic(
+        item.aabDownloadUrl, "application/octet-stream", null
+    )
+
+    /**
+     * Public download via the system DownloadManager. [authHeader], when given,
+     * is attached as an Authorization header (used for the owner-only keystore).
+     */
+    private fun enqueuePublic(urlStr: String, mime: String, authHeader: String?) {
+        if (urlStr.isEmpty()) return
+        val uri = Uri.parse(urlStr)
         val manager = requireContext().getSystemService(DownloadManager::class.java)
-        if (manager == null) {
-            openInBrowser(uri)
-            return
-        }
-        val fileName = uri.lastPathSegment ?: "app.apk"
+        if (manager == null) { openInBrowser(uri); return }
+        val fileName = uri.lastPathSegment ?: "download"
         val request = DownloadManager.Request(uri)
             .setTitle(fileName)
-            .setMimeType("application/vnd.android.package-archive")
+            .setMimeType(mime)
             .setNotificationVisibility(DownloadManager.Request.VISIBILITY_VISIBLE_NOTIFY_COMPLETED)
             .setDestinationInExternalPublicDir(Environment.DIRECTORY_DOWNLOADS, fileName)
+        if (authHeader != null) request.addRequestHeader("Authorization", authHeader)
         try {
             manager.enqueue(request)
             if (isAdded) Toast.makeText(requireContext(), R.string.download_started, Toast.LENGTH_SHORT).show()
         } catch (e: Exception) {
             Log.w(TAG, "Download failed: ${e.message}")
-            openInBrowser(uri)
+            if (authHeader == null) openInBrowser(uri)
+            else if (isAdded) Toast.makeText(requireContext(), R.string.error_generic, Toast.LENGTH_SHORT).show()
         }
+    }
+
+    /**
+     * Keystore download is owner-only: the Worker requires the caller's Firebase
+     * ID token. We fetch a fresh token, then hand the request (with the Bearer
+     * header) to the DownloadManager.
+     */
+    private fun downloadKeystore(item: BuildItem) {
+        if (item.keystoreDownloadUrl.isEmpty()) return
+        val user = auth?.currentUser
+        if (user == null) {
+            if (isAdded) Toast.makeText(requireContext(), R.string.error_generic, Toast.LENGTH_SHORT).show()
+            return
+        }
+        user.getIdToken(false)
+            .addOnSuccessListener { result ->
+                if (!isAdded) return@addOnSuccessListener
+                val token = result.token
+                if (token.isNullOrEmpty()) {
+                    Toast.makeText(requireContext(), R.string.error_generic, Toast.LENGTH_SHORT).show()
+                    return@addOnSuccessListener
+                }
+                enqueuePublic(item.keystoreDownloadUrl, "application/zip", "Bearer $token")
+            }
+            .addOnFailureListener { e ->
+                Log.w(TAG, "Keystore token fetch failed: ${e.message}")
+                if (isAdded) Toast.makeText(requireContext(), R.string.error_generic, Toast.LENGTH_SHORT).show()
+            }
     }
 
     private fun openInBrowser(uri: Uri) {

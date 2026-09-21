@@ -503,20 +503,55 @@ class HomeFragment : Fragment() {
         }
         shadowAnimator.start()
 
-        val minPadding = dpToPx(8)
-        val maxPadding = dpToPx(16)
-        val iconAnimator = ValueAnimator.ofInt(minPadding, maxPadding).apply {
-            duration = 800
-            repeatCount = ValueAnimator.INFINITE
-            repeatMode = ValueAnimator.REVERSE
-            interpolator = AccelerateDecelerateInterpolator()
-            addUpdateListener { anim ->
-                btn.iconPadding = anim.animatedValue as Int
+        val baseArrow = androidx.core.content.ContextCompat.getDrawable(requireContext(), R.drawable.ic_arrow_forward)?.mutate()
+        if (baseArrow != null) {
+            // Forcefully tint the base arrow to the exact current text color using a color filter
+            baseArrow.setColorFilter(btn.currentTextColor, android.graphics.PorterDuff.Mode.SRC_IN)
+            val maxSlide = dpToPx(8).toFloat()
+            val slidingDrawable = object : android.graphics.drawable.Drawable() {
+                var offset = 0f
+                    set(value) { field = value; invalidateSelf() }
+                
+                // Ignore tint updates from MaterialButton to prevent it from overriding our text-matched tint
+                override fun setTintList(tint: android.content.res.ColorStateList?) {}
+                override fun setTint(tintColor: Int) {}
+                override fun setTintMode(tintMode: android.graphics.PorterDuff.Mode?) {}
+                
+                override fun draw(canvas: android.graphics.Canvas) {
+                    canvas.save()
+                    canvas.translate(offset, 0f)
+                    baseArrow.draw(canvas)
+                    canvas.restore()
+                }
+                
+                override fun setBounds(left: Int, top: Int, right: Int, bottom: Int) {
+                    super.setBounds(left, top, right, bottom)
+                    baseArrow.setBounds(left, top, left + baseArrow.intrinsicWidth, bottom)
+                }
+                
+                override fun getIntrinsicWidth() = baseArrow.intrinsicWidth + maxSlide.toInt()
+                override fun getIntrinsicHeight() = baseArrow.intrinsicHeight
+                override fun setAlpha(alpha: Int) { baseArrow.alpha = alpha }
+                override fun setColorFilter(colorFilter: android.graphics.ColorFilter?) { baseArrow.colorFilter = colorFilter }
+                @Deprecated("Deprecated in Java")
+                override fun getOpacity() = baseArrow.opacity
             }
-        }
-        iconAnimator.start()
+            btn.icon = slidingDrawable
 
-        buttonAnimators = listOf(shadowAnimator, iconAnimator)
+            val iconAnimator = ValueAnimator.ofFloat(0f, maxSlide).apply {
+                duration = 800
+                repeatCount = ValueAnimator.INFINITE
+                repeatMode = ValueAnimator.REVERSE
+                interpolator = AccelerateDecelerateInterpolator()
+                addUpdateListener { anim ->
+                    slidingDrawable.offset = anim.animatedValue as Float
+                }
+            }
+            iconAnimator.start()
+            buttonAnimators = listOf(shadowAnimator, iconAnimator)
+        } else {
+            buttonAnimators = listOf(shadowAnimator)
+        }
     }
 
     override fun onDestroyView() {

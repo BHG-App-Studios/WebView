@@ -353,14 +353,14 @@ class HomeFragment : Fragment() {
         if (isOffline()) { toast(R.string.error_no_network); return }
 
         pinging = true
-        entry.startBuildingButton.isEnabled = false
+        entry.startBuildingButton.isClickable = false
         entry.startBuildingButton.text = "Checking…"
         entry.entryProgress.visibility = View.VISIBLE
 
         BuildApi.ping(url) { reachable ->
             if (!isAdded || _binding == null) return@ping
             pinging = false
-            entry.startBuildingButton.isEnabled = true
+            entry.startBuildingButton.isClickable = true
             entry.startBuildingButton.text = "Start Building"
             entry.entryProgress.visibility = View.GONE
 

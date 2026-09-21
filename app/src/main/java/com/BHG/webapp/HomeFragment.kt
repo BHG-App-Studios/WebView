@@ -160,6 +160,10 @@ class HomeFragment : Fragment() {
     private fun setupTopBar() {
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.topBarBack.setOnClickListener { goBack() }
+        // onPageSelected doesn't fire for position 0, so set the initial bar state
+        // explicitly — otherwise the back button keeps its XML visibility and the
+        // title starts indented on first render.
+        updateTopBarForStep(binding.wizardPager.currentItem)
     }
 
     private fun setupNextButton() {
@@ -261,7 +265,10 @@ class HomeFragment : Fragment() {
 
 
     private fun updateTopBarForStep(step: Int) {
-        binding.topBarBack.visibility = if (step > STEP_WEBSITE) View.VISIBLE else View.INVISIBLE
+        // GONE (not INVISIBLE) on step 1 so the hidden back button reserves no space —
+        // the hamburger then sits at the same start position as the other fragments'
+        // top bars, and the title lines up identically.
+        binding.topBarBack.visibility = if (step > STEP_WEBSITE) View.VISIBLE else View.GONE
         binding.topBarMenu.visibility = if (step == STEP_WEBSITE) View.VISIBLE else View.GONE
         binding.topBarTitle.text = listOf("Build App", "App Features", "Permissions").getOrNull(step) ?: "Build App"
     }

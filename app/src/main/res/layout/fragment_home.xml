@@ -24,7 +24,7 @@
             android:gravity="center_vertical"
             android:paddingStart="8dp"
             android:paddingTop="9dp"
-            android:paddingEnd="16dp"
+            android:paddingEnd="8dp"
             android:paddingBottom="9dp">
 
             <!-- Back / menu button -->
@@ -32,13 +32,13 @@
                 android:id="@+id/topBarBack"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Back"
                 android:padding="8dp"
                 android:src="@drawable/ic_chevron_right"
                 android:rotation="180"
-                android:visibility="invisible"
+                android:visibility="gone"
                 app:tint="@color/top_bar_icon" />
 
             <!-- Hamburger (visible only on step 1) -->
@@ -46,7 +46,7 @@
                 android:id="@+id/topBarMenu"
                 android:layout_width="40dp"
                 android:layout_height="40dp"
-                android:layout_marginEnd="4dp"
+                android:layout_marginEnd="8dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
                 android:contentDescription="Open menu"
                 android:padding="8dp"

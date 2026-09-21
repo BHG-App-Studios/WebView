@@ -66,10 +66,38 @@ export default {
         const uploadWebhookUrl = `${url.origin}/api/upload/${buildId}?uid=${uidParam}`;
         const statusWebhookUrl = `${url.origin}/api/report/${buildId}?uid=${uidParam}`;
 
-        // Customisation: app name + package name
+        // Customisation: app name (always safe to derive from the host if blank)
         const appName = normalizeAppName(body.app_name, siteUrl.hostname);
-        const packageName = normalizePackageName(body.package_name)
-          || packageNameFromHost(siteUrl.hostname);
+
+        // Customisation: package name. Four cases, all driven off the URL being
+        // present (already enforced above) plus whether the user typed a package:
+        //   - user left it blank        -> generate from the host
+        //   - user typed a valid one    -> use it exactly, never overwrite
+        //   - user typed an invalid one -> reject with a clear message, so we
+        //                                  never silently replace their choice
+        // A blank app name is fine to auto-fill; a *wrong* package name is not,
+        // so it is surfaced instead of quietly generated.
+        const rawPackage = body.package_name;
+        const userGavePackage =
+          rawPackage !== undefined && rawPackage !== null && String(rawPackage).trim() !== "";
+
+        let packageName;
+        if (userGavePackage) {
+          packageName = normalizePackageName(rawPackage);
+          if (!packageName) {
+            return jsonResponse(
+              {
+                error:
+                  "Invalid package name. Use at least two lowercase segments " +
+                  "separated by dots, e.g. com.yourcompany.app (letters, digits " +
+                  "and underscores only; each segment must start with a letter)."
+              },
+              400, corsHeaders
+            );
+          }
+        } else {
+          packageName = packageNameFromHost(siteUrl.hostname);
+        }
 
         // Customisation: every AppConfig.kt constant
         const resolved = resolveOptions(body);

@@ -1,10 +1,7 @@
 package com.BHG.webapp
 
-import android.animation.AnimatorSet
-import android.animation.ObjectAnimator
-import android.animation.ValueAnimator
 import android.app.DownloadManager
-import android.content.Context
+import android.content.Intent
 import android.net.Uri
 import android.os.Bundle
 import android.os.Environment
@@ -12,23 +9,29 @@ import android.util.Log
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Toast
 import androidx.fragment.app.Fragment
+import androidx.recyclerview.widget.LinearLayoutManager
 import com.BHG.webapp.databinding.FragmentBuildBinding
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
-import java.text.SimpleDateFormat
-import java.util.*
 
 /**
- * Build tab — shows the most recent BUILDING job for the signed-in user.
+ * Active Builds tab — a LIVE view of builds that are currently BUILDING, not a
+ * history list.
  *
- * Opens a real-time Firestore listener ordered by createdAt desc so it
- * automatically picks up a build started from the wizard (HomeFragment)
- * and tracks it all the way to READY or FAILED.
+ * On open it attaches a Firestore snapshot listener to users/{uid}/builds. A
+ * build is shown here only while it is actively BUILDING, plus the brief moment
+ * it flips to READY/FAILED *while the user is watching this session* — so the
+ * download button appears right after a build completes. Once finished, it lives
+ * in the My Apps history ([HistoryFragment]); it does NOT reappear here on a
+ * later visit.
+ *
+ * The "session set" is the mechanism: only builds seen as BUILDING during this
+ * fragment's lifetime are eligible to render. A build that was already finished
+ * before this screen opened is never added, so it stays out of the active list.
  */
 class BuildFragment : Fragment() {
 
@@ -39,10 +42,10 @@ class BuildFragment : Fragment() {
     private val firestore: FirebaseFirestore? by lazy { runCatching { FirebaseFirestore.getInstance() }.getOrNull() }
 
     private var buildListener: ListenerRegistration? = null
-    private var pulseAnimSet: AnimatorSet? = null
+    private lateinit var adapter: ActiveBuildAdapter
 
-    private var currentDownloadUrl: String? = null
-    private var currentBuildStatus: String = ""
+    /** Build IDs seen as BUILDING this session — the only ones allowed to render. */
+    private val sessionActiveIds = HashSet<String>()
 
     override fun onCreateView(
         inflater: LayoutInflater, container: ViewGroup?, savedInstanceState: Bundle?
@@ -53,64 +56,86 @@ class BuildFragment : Fragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        adapter = ActiveBuildAdapter(
+            onDownload = ::startDownload,
+            onRetry = { (activity as? MainActivity)?.goToTab(R.id.nav_landing) }
+        )
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
-        binding.emptyStartBtn.setOnClickListener { (activity as? MainActivity)?.goToTab(R.id.nav_landing) }
-        binding.downloadButton.setOnClickListener { startDownload() }
-        binding.newBuildButton.setOnClickListener {
-            (activity as? MainActivity)?.goToTab(R.id.nav_landing)
-        }
-        observeLatestBuild()
+        binding.emptyRecentBtn.setOnClickListener { (activity as? MainActivity)?.goToTab(R.id.nav_history) }
+        binding.activeList.layoutManager = LinearLayoutManager(requireContext())
+        binding.activeList.adapter = adapter
+        observeActiveBuilds()
     }
 
     // =========================================================================
-    //  Firestore listener — most recent build
+    //  Firestore listener — active builds only
     // =========================================================================
 
-    private fun observeLatestBuild() {
+    private fun observeActiveBuilds() {
         val user = auth?.currentUser
-        val db   = firestore
+        val db = firestore
         if (user == null || db == null) {
             showEmpty()
             return
         }
 
+        binding.activeProgress.visibility = View.VISIBLE
+        // Watch recent builds so we catch the BUILDING -> READY/FAILED transition
+        // live. We keep the limit small; the active set is what actually filters.
         buildListener = db.collection("users").document(user.uid)
             .collection("builds")
             .orderBy("createdAt", Query.Direction.DESCENDING)
-            .limit(1)
+            .limit(20)
             .addSnapshotListener { snapshot, error ->
                 if (_binding == null) return@addSnapshotListener
+                binding.activeProgress.visibility = View.GONE
                 if (error != null) {
-                    Log.w(TAG, "Build listener error: ${error.message}")
-                    showEmpty()
+                    Log.w(TAG, "Active build listener error: ${error.message}")
+                    render()
                     return@addSnapshotListener
                 }
 
-                val doc = snapshot?.documents?.firstOrNull()
-                if (doc == null) {
-                    showEmpty()
-                    return@addSnapshotListener
+                val docs = snapshot?.documents.orEmpty()
+                val items = docs.map { doc ->
+                    BuildItem(
+                        buildId = doc.getString("buildId") ?: doc.id,
+                        appName = doc.getString("appName") ?: "",
+                        url = doc.getString("url") ?: "",
+                        status = doc.getString("status") ?: "BUILDING",
+                        downloadUrl = doc.getString("downloadUrl") ?: "",
+                        createdAtMs = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L
+                    )
                 }
 
-                val status      = doc.getString("status") ?: "BUILDING"
-                val appName     = doc.getString("appName") ?: "My App"
-                val url         = doc.getString("url") ?: ""
-                val downloadUrl = doc.getString("downloadUrl") ?: ""
-                val createdAt   = doc.getTimestamp("createdAt")?.toDate()
-
-                currentDownloadUrl = downloadUrl.ifEmpty { null }
-
-                // Only show card for active builds (BUILDING / READY / FAILED)
-                // Skip very old READY/FAILED ones so empty state shows when idle
-                val ageMs = if (createdAt != null) System.currentTimeMillis() - createdAt.time else 0L
-                val isRecent = ageMs < SHOW_BUILD_MS
-
-                if (status == "BUILDING" || (isRecent && status in listOf("READY","FAILED","REJECTED"))) {
-                    showBuildCard(status, appName, url, createdAt)
-                } else {
-                    showEmpty()
+                // Any build currently BUILDING becomes part of this session's
+                // active set. On the very first snapshot this admits a build that
+                // was already in progress when the screen opened (the intended
+                // "connect to a live build on open" behaviour); on later snapshots
+                // it admits newly started builds.
+                for (item in items) {
+                    if (item.status == "BUILDING") sessionActiveIds.add(item.buildId)
                 }
+
+                lastItems = items
+                render()
             }
+    }
+
+    private var lastItems: List<BuildItem> = emptyList()
+
+    private fun render() {
+        if (_binding == null) return
+        // Only builds admitted to the session set render, so finished builds from
+        // previous visits never resurface here — they belong to My Apps.
+        val active = lastItems
+            .filter { it.buildId in sessionActiveIds }
+            .sortedByDescending { it.createdAtMs }
+
+        if (active.isEmpty()) {
+            showEmpty()
+        } else {
+            showList(active)
+        }
     }
 
     // =========================================================================
@@ -119,118 +144,34 @@ class BuildFragment : Fragment() {
 
     private fun showEmpty() {
         if (_binding == null) return
-        stopPulseAnimation()
-        binding.emptyState.visibility  = View.VISIBLE
-        binding.buildContent.visibility = View.GONE
-        binding.statusBadge.visibility  = View.GONE
+        adapter.submitList(emptyList())
+        binding.emptyState.visibility = View.VISIBLE
+        binding.activeList.visibility = View.GONE
+        binding.statusBadge.visibility = View.GONE
     }
 
-    private fun showBuildCard(status: String, appName: String, url: String, createdAt: Date?) {
+    private fun showList(items: List<BuildItem>) {
         if (_binding == null) return
-        binding.emptyState.visibility   = View.GONE
-        binding.buildContent.visibility = View.VISIBLE
+        binding.emptyState.visibility = View.GONE
+        binding.activeList.visibility = View.VISIBLE
+        adapter.submitList(items)
 
-        // Populate info row
-        binding.buildAppName.text = appName.ifEmpty { "My App" }
-        binding.buildUrl.text     = url
-        binding.buildTime.text    = createdAt?.let { friendlyTime(it) } ?: "Just now"
-
-        when (status) {
-            "BUILDING" -> applyBuildingState()
-            "READY"    -> applyReadyState()
-            else       -> applyFailedState()
+        val building = items.count { it.status == "BUILDING" }
+        binding.statusBadge.visibility = View.VISIBLE
+        binding.statusBadge.text = if (building > 0) {
+            if (building == 1) "1 building" else "$building building"
+        } else {
+            "✓ Ready"
         }
-
-        if (status != currentBuildStatus) {
-            currentBuildStatus = status
-            // Update badge
-            binding.statusBadge.visibility = View.VISIBLE
-            binding.statusBadge.text = when (status) {
-                "READY"  -> "✓ Ready"
-                "FAILED", "REJECTED" -> "✗ Failed"
-                else     -> "Building"
-            }
-        }
-    }
-
-    private fun applyBuildingState() {
-        binding.buildProgressRing.visibility = View.VISIBLE
-        binding.buildCenterIcon.visibility   = View.VISIBLE
-        binding.buildResultIcon.visibility   = View.GONE
-        binding.downloadButton.visibility    = View.GONE
-        binding.newBuildButton.visibility    = View.GONE
-        binding.stepProgress2.visibility     = View.VISIBLE
-        binding.stepIcon3.alpha              = 0.3f
-        binding.buildStatusTitle.text        = "Building your app…"
-        binding.buildStatusText.text         = "This usually takes a few minutes. Stay on this screen."
-        startPulseAnimation()
-    }
-
-    private fun applyReadyState() {
-        stopPulseAnimation()
-        binding.buildProgressRing.visibility = View.GONE
-        binding.buildCenterIcon.visibility   = View.GONE
-        binding.buildResultIcon.visibility   = View.VISIBLE
-        binding.buildResultIcon.setImageResource(R.drawable.ic_download)
-        binding.downloadButton.visibility    = View.VISIBLE
-        binding.newBuildButton.visibility    = View.VISIBLE
-        binding.stepProgress2.visibility     = View.GONE
-        binding.stepIcon3.alpha              = 1f
-        binding.buildStatusTitle.text        = "🎉 Your app is ready!"
-        binding.buildStatusText.text         = "Download the APK and install it on your device."
-    }
-
-    private fun applyFailedState() {
-        stopPulseAnimation()
-        binding.buildProgressRing.visibility = View.GONE
-        binding.buildCenterIcon.visibility   = View.VISIBLE
-        binding.buildResultIcon.visibility   = View.GONE
-        binding.downloadButton.visibility    = View.GONE
-        binding.newBuildButton.visibility    = View.VISIBLE
-        binding.stepProgress2.visibility     = View.GONE
-        binding.buildStatusTitle.text        = "Build failed"
-        binding.buildStatusText.text         = "Something went wrong. Tap below to try again."
-    }
-
-    // =========================================================================
-    //  Pulse animation
-    // =========================================================================
-
-    private fun startPulseAnimation() {
-        if (pulseAnimSet?.isRunning == true) return
-        val b = _binding ?: return
-
-        val outerAlpha = ObjectAnimator.ofFloat(b.buildPulseOuter, "alpha", 0f, 0.4f, 0f).apply {
-            duration = 1600; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.RESTART
-            interpolator = AccelerateDecelerateInterpolator()
-        }
-        val outerScaleX = ObjectAnimator.ofFloat(b.buildPulseOuter, "scaleX", 0.85f, 1.1f).apply {
-            duration = 1600; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.RESTART
-            interpolator = AccelerateDecelerateInterpolator()
-        }
-        val outerScaleY = ObjectAnimator.ofFloat(b.buildPulseOuter, "scaleY", 0.85f, 1.1f).apply {
-            duration = 1600; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.RESTART
-            interpolator = AccelerateDecelerateInterpolator()
-        }
-        val iconRotate = ObjectAnimator.ofFloat(b.buildCenterIcon, "rotation", 0f, 360f).apply {
-            duration = 3000; repeatCount = ValueAnimator.INFINITE; repeatMode = ValueAnimator.RESTART
-            interpolator = AccelerateDecelerateInterpolator()
-        }
-        pulseAnimSet = AnimatorSet().also { it.playTogether(outerAlpha, outerScaleX, outerScaleY, iconRotate); it.start() }
-    }
-
-    private fun stopPulseAnimation() {
-        pulseAnimSet?.cancel(); pulseAnimSet = null
-        _binding?.buildCenterIcon?.rotation = 0f
     }
 
     // =========================================================================
     //  Download
     // =========================================================================
 
-    private fun startDownload() {
-        val url = currentDownloadUrl ?: return
-        val uri = Uri.parse(url)
+    private fun startDownload(item: BuildItem) {
+        if (item.downloadUrl.isEmpty()) return
+        val uri = Uri.parse(item.downloadUrl)
         val mgr = requireContext().getSystemService(DownloadManager::class.java)
         if (mgr == null) { openInBrowser(uri); return }
         val fileName = uri.lastPathSegment ?: "app.apk"
@@ -248,35 +189,17 @@ class BuildFragment : Fragment() {
     }
 
     private fun openInBrowser(uri: Uri) {
-        try { startActivity(android.content.Intent(android.content.Intent.ACTION_VIEW, uri)) }
+        try { startActivity(Intent(Intent.ACTION_VIEW, uri)) }
         catch (e: Exception) { if (isAdded) Toast.makeText(requireContext(), R.string.error_generic, Toast.LENGTH_SHORT).show() }
     }
 
-    // =========================================================================
-    //  Helpers
-    // =========================================================================
-
-    private fun friendlyTime(date: Date): String {
-        val diffMs  = System.currentTimeMillis() - date.time
-        val diffMin = diffMs / 60_000
-        return when {
-            diffMin < 1  -> "Just now"
-            diffMin < 60 -> "${diffMin}m ago"
-            diffMin < 1440 -> "${diffMin / 60}h ago"
-            else -> SimpleDateFormat("MMM d", Locale.getDefault()).format(date)
-        }
-    }
-
     override fun onDestroyView() {
-        stopPulseAnimation()
         buildListener?.remove(); buildListener = null
         _binding = null
         super.onDestroyView()
     }
 
     private companion object {
-        private const val TAG          = "BuildFragment"
-        // Show the build card for up to 24 hours after creation
-        private const val SHOW_BUILD_MS = 24 * 60 * 60 * 1000L
+        private const val TAG = "BuildFragment"
     }
 }

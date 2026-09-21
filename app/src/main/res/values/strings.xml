@@ -95,6 +95,15 @@
     <string name="status_ready">Ready</string>
     <string name="status_failed">Failed</string>
 
+    <!-- Active builds -->
+    <string name="active_empty_title">No Active Builds</string>
+    <string name="active_empty_subtitle">Head over to the Home tab, fill in your website details, and tap Build — your app will appear here while it builds.</string>
+    <string name="active_view_recent">View Recent Builds</string>
+    <string name="active_building_hint">This usually takes a few minutes. You can leave this screen; it will keep building.</string>
+    <string name="active_ready_hint">Your app is ready. Download the APK and install it.</string>
+    <string name="active_failed_hint">Something went wrong. Start a new build to try again.</string>
+    <string name="active_retry">Try Again</string>
+
     <!-- Profile -->
     <string name="profile_stat_total">Total builds</string>
     <string name="profile_stat_ready">Ready</string>

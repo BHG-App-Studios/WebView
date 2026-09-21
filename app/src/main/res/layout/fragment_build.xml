@@ -135,6 +135,8 @@
                 android:layout_marginTop="28dp"
                 android:paddingStart="28dp"
                 android:paddingEnd="28dp"
+                android:background="@drawable/bg_gradient_button"
+                app:backgroundTint="@null"
                 android:text="Start Building"
                 app:icon="@drawable/ic_arrow_forward"
                 app:iconGravity="end"

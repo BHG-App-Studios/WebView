@@ -93,20 +93,34 @@
                 android:imeOptions="actionDone" />
         </com.google.android.material.textfield.TextInputLayout>
 
-        <!-- Full-width Start Building button -->
-        <com.google.android.material.button.MaterialButton
-            android:id="@+id/startBuildingButton"
-            style="@style/Widget.App.Button"
+        <FrameLayout
             android:layout_width="match_parent"
             android:layout_height="54dp"
             android:layout_marginTop="18dp"
-            android:background="@drawable/bg_gradient_button"
-            app:backgroundTint="@null"
-            android:text="Start Building"
-            android:textSize="15sp"
-            app:icon="@drawable/ic_arrow_forward"
-            app:iconGravity="end"
-            app:iconPadding="8dp" />
+            android:clipChildren="true"
+            android:clipToPadding="true">
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/startBuildingButton"
+                style="@style/Widget.App.Button"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_gradient_button"
+                app:backgroundTint="@null"
+                android:text="Start Building"
+                android:textSize="15sp"
+                app:icon="@drawable/ic_arrow_forward"
+                app:iconGravity="textEnd"
+                app:iconPadding="8dp" />
+
+            <View
+                android:id="@+id/startBuildingShadow"
+                android:layout_width="60dp"
+                android:layout_height="match_parent"
+                android:background="@drawable/bg_soft_shadow"
+                android:translationX="-100dp"
+                android:elevation="2dp" />
+        </FrameLayout>
 
         <!-- Inline progress shown while pinging the URL -->
         <ProgressBar

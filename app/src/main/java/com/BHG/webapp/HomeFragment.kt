@@ -50,6 +50,8 @@ class HomeFragment : Fragment() {
     private var stepFeaturesBinding: StepFeaturesBinding? = null
     private var stepPermissionsBinding: StepPermissionsBinding? = null
 
+    private var buttonAnimators: List<ValueAnimator>? = null
+
     /** URL confirmed reachable on the entry screen; reused by the build request. */
     private var confirmedUrl: String = ""
     private var pinging = false
@@ -204,6 +206,7 @@ class HomeFragment : Fragment() {
                     stepEntryBinding = b
                     b.startBuildingButton.setOnClickListener { onStartBuilding() }
                     b.entryUrlInput.setOnEditorActionListener { _, _, _ -> onStartBuilding(); true }
+                    setupButtonAnimations()
                     StepVH(b.root)
                 }
                 STEP_WEBSITE -> {
@@ -486,7 +489,39 @@ class HomeFragment : Fragment() {
 
     private fun dpToPx(dp: Int) = (dp * resources.displayMetrics.density).toInt()
 
+    private fun setupButtonAnimations() {
+        val entry = stepEntryBinding ?: return
+        val shadow = entry.startBuildingShadow
+        val btn = entry.startBuildingButton
+
+        val shadowAnimator = ValueAnimator.ofFloat(-300f, 1500f).apply {
+            duration = 2000
+            repeatCount = ValueAnimator.INFINITE
+            addUpdateListener { anim ->
+                shadow.translationX = anim.animatedValue as Float
+            }
+        }
+        shadowAnimator.start()
+
+        val minPadding = dpToPx(8)
+        val maxPadding = dpToPx(16)
+        val iconAnimator = ValueAnimator.ofInt(minPadding, maxPadding).apply {
+            duration = 800
+            repeatCount = ValueAnimator.INFINITE
+            repeatMode = ValueAnimator.REVERSE
+            interpolator = AccelerateDecelerateInterpolator()
+            addUpdateListener { anim ->
+                btn.iconPadding = anim.animatedValue as Int
+            }
+        }
+        iconAnimator.start()
+
+        buttonAnimators = listOf(shadowAnimator, iconAnimator)
+    }
+
     override fun onDestroyView() {
+        buttonAnimators?.forEach { it.cancel() }
+        buttonAnimators = null
         stepEntryBinding       = null
         stepWebsiteBinding     = null
         stepFeaturesBinding    = null

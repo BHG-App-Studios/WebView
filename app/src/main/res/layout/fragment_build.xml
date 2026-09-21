@@ -41,7 +41,7 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="@font/roboto_bold"
-            android:text="Active Build"
+            android:text="Active Builds"
             android:textColor="@color/top_bar_title"
             android:textSize="@dimen/text_size_20"
             android:textStyle="bold" />

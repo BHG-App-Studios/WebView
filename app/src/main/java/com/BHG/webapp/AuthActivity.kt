@@ -438,8 +438,8 @@ class AuthActivity : AppCompatActivity() {
 
     private companion object {
         private const val TAG = "AuthActivity"
-        private const val PRIVACY_URL = "https://sites.google.com/view/webcraft-privacy"
-        private const val TERMS_URL = "https://sites.google.com/view/webcraft-terms"
-        private const val HELP_URL = "https://sites.google.com/view/webcraft-help"
+        private const val PRIVACY_URL = "https://bhg-app-studios.pages.dev/app-privacy.html?app=website-to-app-builder"
+        private const val TERMS_URL = "https://bhg-app-studios.pages.dev/app-terms.html?app=website-to-app-builder"
+        private const val HELP_URL = "https://bhg-app-studios.pages.dev/contact.html"
     }
 }

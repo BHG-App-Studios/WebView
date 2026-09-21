@@ -338,7 +338,7 @@ class MainActivity : AppCompatActivity() {
     private companion object {
         private const val TAG = "MainActivity"
         private const val KEY_TAB = "current_tab"
-        private const val PRIVACY_URL = "https://sites.google.com/view/website-app-builder-privacy"
-        private const val TERMS_URL = "https://sites.google.com/view/website-app-builder-terms"
+        private const val PRIVACY_URL = "https://bhg-app-studios.pages.dev/app-privacy.html?app=website-to-app-builder"
+        private const val TERMS_URL = "https://bhg-app-studios.pages.dev/app-terms.html?app=website-to-app-builder"
     }
 }

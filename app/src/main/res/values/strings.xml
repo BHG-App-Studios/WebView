@@ -25,17 +25,27 @@
     <string name="sign_in_unknown">Something went wrong. Please try again.</string>
 
     <!-- Bottom navigation -->
+    <string name="nav_landing">Home</string>
     <string name="nav_home">Build</string>
     <string name="nav_history">Apps</string>
     <string name="nav_profile">Account</string>
 
     <!-- Toolbar titles -->
+    <string name="title_landing">Home</string>
     <string name="title_home">Build App</string>
     <string name="title_history">Build History</string>
     <string name="title_profile">Profile</string>
     <string name="open_menu">Open menu</string>
 
     <string name="help">Help</string>
+
+    <!-- Home landing -->
+    <string name="landing_hero_title">Welcome to WebCraft</string>
+    <string name="landing_hero_subtitle">Turn any website into a polished Android app in minutes. Start a new build or manage the ones you already made.</string>
+    <string name="landing_quick_actions">Quick actions</string>
+    <string name="landing_action_apps">View my apps</string>
+    <string name="landing_action_account">Account settings</string>
+    <string name="landing_action_options">How it works &amp; options</string>
 
     <!-- Home / builder -->
     <string name="home_greeting">Create your app</string>
@@ -88,6 +98,15 @@
     <string name="profile_stat_total">Total builds</string>
     <string name="profile_stat_ready">Ready</string>
     <string name="profile_user_id">User ID</string>
+
+    <!-- Options bottom sheet -->
+    <string name="sheet_title">Options</string>
+    <string name="sheet_s1_title">How it works</string>
+    <string name="sheet_s1_body">Paste your website URL, choose the features and permissions your app needs, then tap Build App. We package it into an Android app you can download and publish.</string>
+    <string name="sheet_s2_title">Features you can add</string>
+    <string name="sheet_s2_body">Pull to refresh, file uploads, downloads, a loading bar, offline error page, fullscreen video and more — toggle only what your site uses.</string>
+    <string name="sheet_s3_title">Support</string>
+    <string name="sheet_s3_body">Have a problem or a request? Open the menu for Privacy, Terms and to rate the app. Every build is saved under the Apps tab.</string>
 
     <!-- Drawer -->
     <string name="drawer_subtitle">Settings &amp; more</string>

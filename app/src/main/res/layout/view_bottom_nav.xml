@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Floating, rounded (capsule) bottom navigation. Four MaterialButton "pills":
+     each always shows its icon; the selected one also shows its text label, so it
+     expands while the others stay icon-only. The label is toggled at runtime and the
+     change is animated with a LayoutTransition on this row, giving the smooth
+     grow/shrink you see in the reference app.
+
+     animateLayoutChanges drives the expand/collapse; the row is padded so the pills
+     sit inside the capsule with even spacing. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/navCapsule"
+    android:layout_width="wrap_content"
+    android:layout_height="wrap_content"
+    android:orientation="horizontal"
+    android:gravity="center_vertical"
+    android:background="@drawable/bg_nav_capsule"
+    android:elevation="10dp"
+    android:paddingStart="6dp"
+    android:paddingEnd="6dp"
+    android:paddingTop="6dp"
+    android:paddingBottom="6dp"
+    android:animateLayoutChanges="true">
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/navLanding"
+        style="@style/Widget.App.NavItem"
+        android:layout_marginStart="2dp"
+        android:layout_marginEnd="2dp"
+        android:contentDescription="@string/nav_landing"
+        app:icon="@drawable/ic_home_nav" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/navBuild"
+        style="@style/Widget.App.NavItem"
+        android:layout_marginStart="2dp"
+        android:layout_marginEnd="2dp"
+        android:contentDescription="@string/nav_home"
+        app:icon="@drawable/ic_build_nav" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/navApps"
+        style="@style/Widget.App.NavItem"
+        android:layout_marginStart="2dp"
+        android:layout_marginEnd="2dp"
+        android:contentDescription="@string/nav_history"
+        app:icon="@drawable/ic_apps_nav" />
+
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/navAccount"
+        style="@style/Widget.App.NavItem"
+        android:layout_marginStart="2dp"
+        android:layout_marginEnd="2dp"
+        android:contentDescription="@string/nav_profile"
+        app:icon="@drawable/ic_account_nav" />
+
+</LinearLayout>

@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Pill behind the active bottom-nav item. The button supplies the rounded shape
+     (cornerRadius in Widget.App.NavItem), so this only has to be the fill. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/brand_primary" android:state_checked="true" />
+    <item android:color="@android:color/transparent" />
+</selector>

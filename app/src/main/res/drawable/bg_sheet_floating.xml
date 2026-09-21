@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Surface for the floating bottom sheet: all four corners rounded so, combined
+     with the dialog's side/bottom margins, it reads as a card hovering above the
+     screen edge rather than a panel welded to it. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android"
+    android:shape="rectangle">
+    <solid android:color="@color/nav_bar_bg" />
+    <corners android:radius="28dp" />
+</shape>

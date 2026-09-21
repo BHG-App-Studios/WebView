@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Accent (Material dark): desaturated purple #BB86FC -->
-    <color name="brand_primary">#BB86FC</color>
-    <color name="brand_primary_bright">#CFB3FF</color>
-    <color name="brand_violet">#CFB3FF</color>
-    <color name="brand_on_primary">#121212</color>
+    <!-- Accent (dark): the vivid sky blue. onPrimary is a deep blue rather than white —
+         white on #00BFFF is only about 2.2:1, where #00344F on it clears 7:1. -->
+    <color name="brand_primary">#00BFFF</color>
+    <color name="brand_primary_bright">#5FD3FF</color>
+    <color name="brand_violet">#5FD3FF</color>
+    <color name="brand_on_primary">#00344F</color>
 
     <!-- DARK surfaces & text (Google Material dark spec) -->
     <color name="bg">#121212</color>
@@ -17,9 +18,9 @@
     <color name="text_secondary">#9AA0A6</color>
     <color name="text_tertiary">#8A8A8A</color>
 
-    <!-- Neutral tinted containers -->
-    <color name="primary_container">#2C2732</color>
-    <color name="on_primary_container">#E6E6E6</color>
+    <!-- Tinted containers -->
+    <color name="primary_container">#00456B</color>
+    <color name="on_primary_container">#CDE9FF</color>
 
     <!-- Status -->
     <color name="success">#81C995</color>
@@ -47,4 +48,5 @@
 
     <!-- Scrim -->
     <color name="scrim">#99000000</color>
+    <color name="nav_capsule_stroke">#1FFFFFFF</color>
 </resources>

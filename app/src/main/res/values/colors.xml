@@ -1,13 +1,16 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Launcher / splash brand background -->
-    <color name="ic_launcher_background">#6200EE</color>
-    <color name="splash_background">#6200EE</color>
+    <!-- Launcher / splash. The splash glyph is white, so the splash uses the deeper primary
+         rather than the vivid #00A3FF — white on #00A3FF is only about 2.7:1. -->
+    <color name="ic_launcher_background">#00A3FF</color>
+    <color name="splash_background">#0077D4</color>
 
-    <!-- Accent (Material light): purple #6200EE for primary actions -->
-    <color name="brand_primary">#6200EE</color>
-    <color name="brand_primary_bright">#7C4DFF</color>
-    <color name="brand_violet">#7C4DFF</color>
+    <!-- Accent: the logo's sky blue. Light mode takes the deeper tone so white button labels
+         and primary-coloured text clear 4.5:1 on light surfaces; dark mode takes the vivid
+         tone, which reads at roughly 8:1 on the dark surface. -->
+    <color name="brand_primary">#0077D4</color>
+    <color name="brand_primary_bright">#00A3FF</color>
+    <color name="brand_violet">#00A3FF</color>
     <color name="brand_on_primary">#FFFFFF</color>
 
     <!-- LIGHT surfaces & text (Google Material light spec) -->
@@ -21,9 +24,9 @@
     <color name="text_secondary">#5F6368</color>
     <color name="text_tertiary">#9E9E9E</color>
 
-    <!-- Neutral tinted containers (selected tab, avatar ring, status circles) -->
-    <color name="primary_container">#EDE7F6</color>
-    <color name="on_primary_container">#1F1F1F</color>
+    <!-- Tinted containers (active-tab pill, avatar ring, status circles) -->
+    <color name="primary_container">#D6EEFF</color>
+    <color name="on_primary_container">#00344F</color>
 
     <!-- Status -->
     <color name="success">#1E8E3E</color>
@@ -63,4 +66,5 @@
 
     <!-- Scrim -->
     <color name="scrim">#66000000</color>
+    <color name="nav_capsule_stroke">#1A000000</color>
 </resources>

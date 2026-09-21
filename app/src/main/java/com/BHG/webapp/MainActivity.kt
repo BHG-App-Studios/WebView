@@ -3,6 +3,7 @@ package com.BHG.webapp
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.ViewGroup
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -12,6 +13,7 @@ import androidx.core.view.WindowInsetsCompat
 import androidx.drawerlayout.widget.DrawerLayout
 import androidx.fragment.app.Fragment
 import com.BHG.webapp.databinding.ActivityMainBinding
+import com.google.android.material.button.MaterialButton
 import com.google.android.material.button.MaterialButtonToggleGroup
 import com.google.firebase.auth.FirebaseAuth
 import com.google.firebase.auth.FirebaseUser
@@ -36,6 +38,16 @@ class MainActivity : AppCompatActivity() {
     private var firestore: FirebaseFirestore? = null
 
     private var currentTab = 0
+
+    private lateinit var navButtons: List<Pair<Int, MaterialButton>>
+    private val navPillMargin by lazy { resources.getDimensionPixelSize(R.dimen.nav_pill_margin) }
+
+    private val navLabels = mapOf(
+        R.id.nav_landing to R.string.nav_landing,
+        R.id.nav_home to R.string.nav_home,
+        R.id.nav_history to R.string.nav_history,
+        R.id.nav_profile to R.string.nav_profile
+    )
 
     override fun onCreate(savedInstanceState: Bundle?) {
         installSplashScreen()
@@ -74,10 +86,11 @@ class MainActivity : AppCompatActivity() {
         setupBottomNav()
 
         if (savedInstanceState == null) {
-            selectTab(R.id.nav_home)
+            selectTab(R.id.nav_landing)
         } else {
-            currentTab = savedInstanceState.getInt(KEY_TAB, R.id.nav_home)
+            currentTab = savedInstanceState.getInt(KEY_TAB, R.id.nav_landing)
         }
+        syncNavSelection()
     }
 
     private fun applyInsets() {
@@ -85,17 +98,51 @@ class MainActivity : AppCompatActivity() {
         ViewCompat.setOnApplyWindowInsetsListener(binding.mainContainer) { v, insets ->
             val systemBars = insets.getInsets(WindowInsetsCompat.Type.systemBars())
             v.setPadding(systemBars.left, systemBars.top, systemBars.right, 0)
-            binding.bottomNavContainer.setPadding(0, 0, 0, systemBars.bottom)
+            // The capsule floats above the gesture bar: keep its bottom margin above
+            // the system inset so it never sits under the navigation bar.
+            val lp = binding.bottomNav.navCapsule.layoutParams as ViewGroup.MarginLayoutParams
+            lp.bottomMargin = navPillMargin + systemBars.bottom
+            binding.bottomNav.navCapsule.layoutParams = lp
             WindowInsetsCompat.CONSUMED
         }
     }
 
+    /**
+     * Wires the four capsule buttons. Selecting one checks it (which fills its pill
+     * and reveals its label) and clears the others; the row's animateLayoutChanges
+     * makes the grow/shrink smooth. Reselecting the current tab is a no-op.
+     */
     private fun setupBottomNav() {
-        binding.bottomNavigation.setOnItemSelectedListener { item ->
-            selectTab(item.itemId)
-            true
+        navButtons = listOf(
+            R.id.nav_landing to binding.bottomNav.navLanding,
+            R.id.nav_home to binding.bottomNav.navBuild,
+            R.id.nav_history to binding.bottomNav.navApps,
+            R.id.nav_profile to binding.bottomNav.navAccount
+        )
+        val labels = mapOf(
+            R.id.nav_landing to R.string.nav_landing,
+            R.id.nav_home to R.string.nav_home,
+            R.id.nav_history to R.string.nav_history,
+            R.id.nav_profile to R.string.nav_profile
+        )
+        navButtons.forEach { (id, button) ->
+            button.isCheckable = true
+            button.setOnClickListener {
+                if (id != currentTab) selectTab(id)
+                syncNavSelection()
+            }
         }
-        binding.bottomNavigation.setOnItemReselectedListener { /* no-op: don't reload */ }
+        syncNavSelection()
+    }
+
+    /** Checks the active button (label shown) and collapses the rest to icon-only. */
+    private fun syncNavSelection() {
+        if (!::navButtons.isInitialized) return
+        navButtons.forEach { (id, button) ->
+            val selected = id == currentTab
+            button.isChecked = selected
+            button.text = if (selected) getString(navLabels.getValue(id)) else ""
+        }
     }
 
     /** Opens the drawer. Called from each fragment's own top bar menu button. */
@@ -103,17 +150,30 @@ class MainActivity : AppCompatActivity() {
         binding.drawerLayout.openDrawer(GravityCompat.START)
     }
 
+    /** Shows the floating options bottom sheet. */
+    fun openOptionsSheet() {
+        OptionsSheet().show(supportFragmentManager, OptionsSheet.TAG)
+    }
+
     private fun selectTab(itemId: Int) {
         val fragment: Fragment = when (itemId) {
+            R.id.nav_home -> HomeFragment()
             R.id.nav_history -> HistoryFragment()
             R.id.nav_profile -> ProfileFragment()
-            else -> HomeFragment()
+            else -> LandingFragment()
         }
         currentTab = itemId
         supportFragmentManager.beginTransaction()
             .setReorderingAllowed(true)
             .replace(R.id.fragmentContainer, fragment)
             .commit()
+    }
+
+    /** Public entry point for a fragment to switch tabs (e.g. Home's quick actions). */
+    fun goToTab(itemId: Int) {
+        if (itemId == currentTab) return
+        selectTab(itemId)
+        syncNavSelection()
     }
 
     // ---- Drawer / settings ---------------------------------------------------
@@ -203,8 +263,8 @@ class MainActivity : AppCompatActivity() {
     override fun onBackPressed() {
         if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
             binding.drawerLayout.closeDrawer(GravityCompat.START)
-        } else if (currentTab != R.id.nav_home) {
-            binding.bottomNavigation.selectedItemId = R.id.nav_home
+        } else if (currentTab != R.id.nav_landing) {
+            goToTab(R.id.nav_landing)
         } else {
             @Suppress("DEPRECATION")
             super.onBackPressed()

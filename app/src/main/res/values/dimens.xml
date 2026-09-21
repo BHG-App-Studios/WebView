@@ -9,8 +9,10 @@
     <dimen name="main_bar_height">64dp</dimen>
     <dimen name="text_size_20">20sp</dimen>
 
-    <!-- Bottom navigation (matches reference production app) -->
-    <dimen name="bottom_nav_icon_size">28dp</dimen>
-    <dimen name="bottom_nav_padding_top">2dp</dimen>
-    <dimen name="bottom_nav_padding_bottom">11dp</dimen>
+    <!-- Floating bottom navigation capsule -->
+    <dimen name="nav_pill_margin">16dp</dimen>
+    <dimen name="nav_pill_radius">32dp</dimen>
+    <dimen name="nav_item_height">48dp</dimen>
+    <dimen name="nav_item_icon_size">24dp</dimen>
+    <dimen name="nav_item_icon_padding">8dp</dimen>
 </resources>

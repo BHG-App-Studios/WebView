@@ -105,9 +105,9 @@ jobs:
         id: signing
         working-directory: ./Splash_WebView
         env:
-          SIGNING_FETCH_URL: ${{ github.event.client_payload.signing_fetch_url }}
-          BUILD_TYPE: ${{ github.event.client_payload.build_type }}
-          SIGNING_MODE: ${{ github.event.client_payload.signing_mode }}
+          SIGNING_FETCH_URL: ${{ github.event.client_payload.build.signing_fetch_url }}
+          BUILD_TYPE: ${{ github.event.client_payload.build.build_type }}
+          SIGNING_MODE: ${{ github.event.client_payload.build.signing_mode }}
           PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
@@ -189,7 +189,7 @@ jobs:
         working-directory: ./Splash_WebView
         env:
           BUILD_TYPE: ${{ steps.signing.outputs.build_type }}
-          OUTPUTS_JSON: ${{ toJson(github.event.client_payload.outputs) }}
+          OUTPUTS_JSON: ${{ toJson(github.event.client_payload.build.outputs) }}
         run: |
           chmod +x gradlew
           # Determine which Gradle tasks to run from build_type + outputs.
@@ -215,7 +215,7 @@ jobs:
         env:
           UPLOAD_WEBHOOK: ${{ github.event.client_payload.upload_webhook_url }}
           BUILD_TYPE: ${{ steps.signing.outputs.build_type }}
-          OUTPUTS_JSON: ${{ toJson(github.event.client_payload.outputs) }}
+          OUTPUTS_JSON: ${{ toJson(github.event.client_payload.build.outputs) }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
           if [ -z "$UPLOAD_WEBHOOK" ]; then
@@ -258,7 +258,7 @@ jobs:
         working-directory: ./Splash_WebView
         env:
           UPLOAD_WEBHOOK: ${{ github.event.client_payload.upload_webhook_url }}
-          SIGNING_FETCH_URL: ${{ github.event.client_payload.signing_fetch_url }}
+          SIGNING_FETCH_URL: ${{ github.event.client_payload.build.signing_fetch_url }}
           PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |

@@ -900,6 +900,11 @@ async function triggerGitHubAction(env, buildConfig) {
     },
     body: JSON.stringify({
       event_type: eventType,
+      // GitHub's repository_dispatch caps client_payload at 10 TOP-LEVEL
+      // properties (see the REST docs). We were sending 12, so the /dispatches
+      // call returned 422 ("Validation failed") and the workflow never fired.
+      // The four build/signing meta fields are grouped under one `build` object
+      // to stay under the cap (9 top-level keys). Nested keys don't count.
       client_payload: {
         build_id: buildConfig.BUILD_ID,
         webview_url: buildConfig.WEBVIEW_URL,
@@ -909,10 +914,12 @@ async function triggerGitHubAction(env, buildConfig) {
         remove_permissions: buildConfig.REMOVE_PERMISSIONS,
         upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL,
         status_webhook_url: buildConfig.STATUS_WEBHOOK_URL,
-        build_type: buildConfig.BUILD_TYPE,
-        outputs: buildConfig.OUTPUTS,
-        signing_mode: buildConfig.SIGNING_MODE,
-        signing_fetch_url: buildConfig.SIGNING_FETCH_URL
+        build: {
+          build_type: buildConfig.BUILD_TYPE,
+          outputs: buildConfig.OUTPUTS,
+          signing_mode: buildConfig.SIGNING_MODE,
+          signing_fetch_url: buildConfig.SIGNING_FETCH_URL
+        }
       }
     })
   });

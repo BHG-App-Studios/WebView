@@ -363,26 +363,33 @@ function normalizePackageName(raw) {
   return pkg;
 }
 
-/** Derives a package name from a hostname: www.example.com -> com.example.webview */
+/**
+ * Derives a package name from a hostname.
+ *
+ * Simple and bulletproof: grab the site name (the first label of the host,
+ * ignoring "www"), strip anything that isn't a letter or digit, and use
+ * com.{name}.webview.
+ *
+ * Examples:
+ *   google.com                -> com.google.webview
+ *   digitalindiaportal.co.in  -> com.digitalindiaportal.webview
+ *   hindi-news-web.co-free.net -> com.hindinewsweb.webview
+ *   www.example.com           -> com.example.webview
+ *   adfs.ed.act.edu.au        -> com.adfs.webview
+ */
 function packageNameFromHost(hostname) {
-  const labels = String(hostname)
-    .toLowerCase()
-    .split(".")
-    .filter((label) => label && label !== "www")
-    .map((label) => label.replace(/[^a-z0-9_]/g, "_"))
-    .map((label) => (/^[0-9]/.test(label) ? `_${label}` : label))
-    .map((label) => (RESERVED_WORDS.has(label) ? `${label}_` : label));
+  // 1. Grab the site name: first label of the host, skip "www"
+  const labels = String(hostname).toLowerCase().split(".")
+    .filter((l) => l && l !== "www");
+  let name = (labels[0] || "").replace(/[^a-z0-9]/g, "");
 
-  if (labels.length < 2) return "com.bhg.webview";
+  // 2. Safety: must be non-empty, start with a letter, not be a keyword
+  if (!name || name.length < 2)                   return "com.bhg.webview";
+  if (/^[^a-z]/.test(name))                       name = "x" + name;
+  if (RESERVED_WORDS.has(name))                    name = name + "app";
+  if (name.length > 50)                            name = name.substring(0, 50);
 
-  const pkg = [...labels.reverse(), "webview"].join(".");
-  if (pkg.length > 100) return "com.bhg.webview";
-
-  // Final safety: reject anything the per-label pass could not catch
-  if (!/^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)+$/.test(pkg)) return "com.bhg.webview";
-  if (pkg.split(".").some((s) => RESERVED_WORDS.has(s))) return "com.bhg.webview";
-
-  return pkg;
+  return `com.${name}.webview`;
 }
 
 /** Cleans a display name. XML/Android escaping happens in the workflow. */

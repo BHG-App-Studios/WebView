@@ -22,6 +22,13 @@
     <color name="primary_container">#00456B</color>
     <color name="on_primary_container">#CDE9FF</color>
 
+    <!-- Switch toggles (Dark Mode) -->
+    <color name="switch_track_checked">@color/brand_primary</color>
+    <color name="switch_thumb_checked">@color/brand_on_primary</color>
+    <color name="switch_track_unchecked">#242932</color>
+    <color name="switch_track_outline_unchecked">#565E6D</color>
+    <color name="switch_thumb_unchecked">#B4BAC6</color>
+
     <!-- Status -->
     <color name="success">#81C995</color>
     <color name="success_container">#1B3226</color>

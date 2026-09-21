@@ -48,6 +48,8 @@
 
         <!-- Component shapes -->
         <item name="materialButtonStyle">@style/Widget.App.Button</item>
+        <item name="materialSwitchStyle">@style/Widget.App.Switch</item>
+        <item name="switchStyle">@style/Widget.App.Switch</item>
     </style>
 
     <!-- Splash (Android 12+ compatible via core-splashscreen) -->
@@ -98,6 +100,12 @@
         <item name="fontFamily">@font/roboto_semibold</item>
         <item name="android:textAllCaps">false</item>
         <item name="cornerRadius">@dimen/field_radius</item>
+    </style>
+
+    <style name="Widget.App.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
+        <item name="trackTint">@color/switch_track_tint</item>
+        <item name="thumbTint">@color/switch_thumb_tint</item>
+        <item name="trackDecorationTint">@color/switch_track_decoration_tint</item>
     </style>
 
     <style name="Widget.App.Card" parent="Widget.Material3.CardView.Elevated">

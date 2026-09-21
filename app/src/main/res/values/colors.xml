@@ -28,6 +28,13 @@
     <color name="primary_container">#D6EEFF</color>
     <color name="on_primary_container">#00344F</color>
 
+    <!-- Switch toggles (Light Mode) -->
+    <color name="switch_track_checked">@color/brand_primary</color>
+    <color name="switch_thumb_checked">@color/brand_on_primary</color>
+    <color name="switch_track_unchecked">#E6E9EE</color>
+    <color name="switch_track_outline_unchecked">#8E95A3</color>
+    <color name="switch_thumb_unchecked">#636B79</color>
+
     <!-- Status -->
     <color name="success">#1E8E3E</color>
     <color name="success_container">#E6F4EA</color>

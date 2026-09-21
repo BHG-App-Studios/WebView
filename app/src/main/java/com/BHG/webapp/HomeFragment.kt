@@ -291,7 +291,7 @@ class HomeFragment : Fragment() {
 
     private fun goBack() {
         val cur = binding.wizardPager.currentItem
-        if (cur > STEP_WEBSITE) binding.wizardPager.setCurrentItem(cur - 1, true)
+        if (cur > PAGE_ENTRY) binding.wizardPager.setCurrentItem(cur - 1, true)
     }
 
     /** Step 1 → Step 2. App name/package are optional, so no validation is needed. */

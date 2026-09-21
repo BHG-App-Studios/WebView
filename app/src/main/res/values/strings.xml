@@ -28,7 +28,7 @@
     <string name="nav_landing">Home</string>
     <string name="nav_home">Build</string>
     <string name="nav_history">Apps</string>
-    <string name="nav_profile">Account</string>
+    <string name="nav_profile">Profile</string>
 
     <!-- Toolbar titles -->
     <string name="title_landing">Home</string>

@@ -246,6 +246,13 @@ class HomeFragment : Fragment() {
                     val b = StepPermissionsBinding.inflate(inf, parent, false)
                     stepPermissionsBinding = b
                     buildPermissionToggles(b)
+                    b.buildButton.isEnabled = b.ownershipCheckbox.isChecked
+                    b.ownershipCheckbox.setOnCheckedChangeListener { _, isChecked ->
+                        b.buildButton.isEnabled = isChecked
+                    }
+                    b.ownershipLayout.setOnClickListener {
+                        b.ownershipCheckbox.isChecked = !b.ownershipCheckbox.isChecked
+                    }
                     b.buildButton.setOnClickListener { onBuildClicked() }
                     StepVH(b.root)
                 }
@@ -477,7 +484,10 @@ class HomeFragment : Fragment() {
     private fun resetWizard() {
         buildDispatching = false
         confirmedUrl = ""
-        stepPermissionsBinding?.buildButton?.isEnabled = true
+        stepPermissionsBinding?.let { b ->
+            b.ownershipCheckbox.isChecked = false
+            b.buildButton.isEnabled = false
+        }
         binding.wizardPager.setCurrentItem(PAGE_ENTRY, false)
         stepEntryBinding?.entryUrlInput?.text?.clear()
         stepWebsiteBinding?.appNameInput?.text?.clear()
@@ -487,7 +497,9 @@ class HomeFragment : Fragment() {
 
     private fun resetBuildButton() {
         buildDispatching = false
-        stepPermissionsBinding?.buildButton?.isEnabled = true
+        stepPermissionsBinding?.let { b ->
+            b.buildButton.isEnabled = b.ownershipCheckbox.isChecked
+        }
     }
 
     private fun toast(resId: Int) { if (isAdded) Toast.makeText(requireContext(), resId, Toast.LENGTH_SHORT).show() }

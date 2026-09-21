@@ -84,9 +84,9 @@
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
             android:layout_marginTop="14dp"
-            android:hint="Package Name (optional)"
+            android:hint="@string/label_package_name"
             app:helperTextEnabled="true"
-            app:helperText="Leave blank to auto-generate from the URL">
+            app:helperText="@string/package_helper">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/packageInput"

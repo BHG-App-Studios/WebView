@@ -53,7 +53,7 @@
     <string name="label_url">Website URL</string>
     <string name="label_app_name">App name</string>
     <string name="label_package_name">Package name (optional)</string>
-    <string name="package_helper">Leave blank to auto-generate from the URL</string>
+    <string name="package_helper">Optional. Example: com.yourcompany.app — leave blank to auto-generate from the URL</string>
     <string name="section_features">Features</string>
     <string name="section_permissions">Permissions</string>
     <string name="section_permissions_hint">Turn off anything your app does not need. Internet access is always included.</string>

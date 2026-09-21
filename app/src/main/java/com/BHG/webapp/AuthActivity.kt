@@ -8,6 +8,8 @@ import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.os.Bundle
 import android.os.CancellationSignal
+import android.os.SystemClock
+import android.text.InputType
 import android.text.Spannable
 import android.text.SpannableString
 import android.text.method.LinkMovementMethod
@@ -17,6 +19,9 @@ import android.view.View
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.view.animation.DecelerateInterpolator
 import android.view.animation.OvershootInterpolator
+import android.widget.ImageButton
+import android.widget.LinearLayout
+import android.widget.TextView
 import android.widget.Toast
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
@@ -36,6 +41,10 @@ import androidx.credentials.exceptions.GetCredentialException
 import androidx.credentials.exceptions.GetCredentialInterruptedException
 import androidx.credentials.exceptions.NoCredentialException
 import com.BHG.webapp.databinding.ActivityAuthBinding
+import com.google.android.material.bottomsheet.BottomSheetDialog
+import com.google.android.material.button.MaterialButton
+import com.google.android.material.textfield.TextInputEditText
+import com.google.android.material.textfield.TextInputLayout
 import com.google.android.libraries.identity.googleid.GetSignInWithGoogleOption
 import com.google.android.libraries.identity.googleid.GoogleIdTokenCredential
 import com.google.android.libraries.identity.googleid.GoogleIdTokenParsingException
@@ -85,6 +94,13 @@ class AuthActivity : AppCompatActivity() {
     // Allows an in-flight credential request to be cancelled on teardown.
     private var cancellationSignal: CancellationSignal? = null
 
+    // Hidden reviewer access: rapid taps on the title reveal an email/password
+    // sign-in sheet. This is a real Firebase account (created in the console),
+    // not a bypass - it still yields a normal ID token and full functionality.
+    private var titleTapCount = 0
+    private var lastTitleTapAt = 0L
+    private var reviewerSheet: BottomSheetDialog? = null
+
     override fun onCreate(savedInstanceState: Bundle?) {
         // Swaps the splash theme for Theme.WebsiteAppBuilder (postSplashScreenTheme) before any
         // view is inflated, so Material attributes resolve correctly.
@@ -130,6 +146,9 @@ class AuthActivity : AppCompatActivity() {
 
         binding.signInButton.setOnClickListener { startSignIn() }
         binding.helpButton.setOnClickListener { openUrl(HELP_URL) }
+
+        // Hidden entry point for reviewers/testers - tap the title rapidly.
+        binding.titleText.setOnClickListener { onTitleTapped() }
 
         setupTermsLinks()
         runEntranceAnimations()
@@ -335,6 +354,131 @@ class AuthActivity : AppCompatActivity() {
         }
     }
 
+    // ---------------------------------------------------------------------
+    // Hidden reviewer access (email/password)
+    // ---------------------------------------------------------------------
+
+    /** Counts rapid taps on the title; opens the access sheet on the Nth. */
+    private fun onTitleTapped() {
+        val now = SystemClock.elapsedRealtime()
+        titleTapCount = if (now - lastTitleTapAt <= TAP_WINDOW_MS) titleTapCount + 1 else 1
+        lastTitleTapAt = now
+        if (titleTapCount >= TAPS_TO_UNLOCK) {
+            titleTapCount = 0
+            showReviewerAccessSheet()
+        }
+    }
+
+    /**
+     * A bottom sheet with email + password fields, wired to Firebase
+     * Email/Password sign-in. Success flows through the same path as Google
+     * sign-in (saveProfile + goToMain), so the resulting session is identical.
+     */
+    private fun showReviewerAccessSheet() {
+        if (isFinishing || isDestroyed) return
+        if (reviewerSheet?.isShowing == true) return
+
+        val density = resources.displayMetrics.density
+        fun dp(value: Int) = (value * density).toInt()
+        val match = LinearLayout.LayoutParams.MATCH_PARENT
+        val wrap = LinearLayout.LayoutParams.WRAP_CONTENT
+
+        val container = LinearLayout(this).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(dp(24), dp(20), dp(24), dp(24))
+        }
+
+        val headerRow = LinearLayout(this).apply {
+            orientation = LinearLayout.HORIZONTAL
+            gravity = android.view.Gravity.CENTER_VERTICAL
+        }
+        val header = TextView(this).apply {
+            text = getString(R.string.reviewer_access_title)
+            textSize = 18f
+            setTypeface(typeface, android.graphics.Typeface.BOLD)
+        }
+        headerRow.addView(header, LinearLayout.LayoutParams(0, wrap, 1f))
+        val closeButton = ImageButton(this).apply {
+            setImageResource(R.drawable.ic_close)
+            background = null
+            contentDescription = getString(android.R.string.cancel)
+        }
+        headerRow.addView(closeButton, LinearLayout.LayoutParams(dp(40), dp(40)))
+        container.addView(headerRow, LinearLayout.LayoutParams(match, wrap))
+
+        val emailLayout = TextInputLayout(this).apply {
+            hint = getString(R.string.reviewer_access_email)
+        }
+        val emailInput = TextInputEditText(emailLayout.context).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_EMAIL_ADDRESS
+        }
+        emailLayout.addView(emailInput)
+        container.addView(emailLayout, LinearLayout.LayoutParams(match, wrap).apply { topMargin = dp(16) })
+
+        val passLayout = TextInputLayout(this).apply {
+            hint = getString(R.string.reviewer_access_password)
+            endIconMode = TextInputLayout.END_ICON_PASSWORD_TOGGLE
+        }
+        val passInput = TextInputEditText(passLayout.context).apply {
+            inputType = InputType.TYPE_CLASS_TEXT or InputType.TYPE_TEXT_VARIATION_PASSWORD
+        }
+        passLayout.addView(passInput)
+        container.addView(passLayout, LinearLayout.LayoutParams(match, wrap).apply { topMargin = dp(8) })
+
+        val submit = MaterialButton(this).apply {
+            text = getString(R.string.reviewer_access_button)
+        }
+        container.addView(submit, LinearLayout.LayoutParams(match, wrap).apply { topMargin = dp(20) })
+
+        val dialog = BottomSheetDialog(this)
+        dialog.setContentView(container)
+        // Closable only via the X button - not by tapping outside, back, or swipe.
+        dialog.setCanceledOnTouchOutside(false)
+        dialog.setCancelable(false)
+        reviewerSheet = dialog
+
+        closeButton.setOnClickListener { runCatching { dialog.dismiss() } }
+
+        submit.setOnClickListener {
+            val email = emailInput.text?.toString()?.trim().orEmpty()
+            val password = passInput.text?.toString().orEmpty()
+            if (email.isEmpty() || password.isEmpty()) {
+                Toast.makeText(this, R.string.reviewer_access_empty, Toast.LENGTH_SHORT).show()
+                return@setOnClickListener
+            }
+            submit.isEnabled = false
+            reviewerSignIn(email, password, dialog, submit)
+        }
+
+        dialog.show()
+    }
+
+    private fun reviewerSignIn(
+        email: String,
+        password: String,
+        dialog: BottomSheetDialog,
+        submit: MaterialButton
+    ) {
+        if (isOffline()) {
+            toast(R.string.sign_in_no_network)
+            submit.isEnabled = true
+            return
+        }
+        val localAuth = auth ?: FirebaseAuth.getInstance()
+        localAuth.signInWithEmailAndPassword(email, password).addOnCompleteListener(this) { task ->
+            if (isFinishing || isDestroyed) return@addOnCompleteListener
+            if (task.isSuccessful && localAuth.currentUser != null) {
+                runCatching { dialog.dismiss() }
+                saveProfile(localAuth.currentUser!!)
+                goToMain()
+            } else {
+                Log.w(TAG, "Reviewer sign-in failed: ${task.exception?.message}")
+                submit.isEnabled = true
+                toast(messageForFirebaseError(task.exception))
+            }
+        }
+    }
+
     /** Maps a Credential Manager error to the right user-facing message. */
     private fun messageForCredentialError(e: GetCredentialException): Int = when (e) {
         is GetCredentialCancellationException -> R.string.sign_in_cancelled
@@ -433,11 +577,16 @@ class AuthActivity : AppCompatActivity() {
         cancellationSignal = null
         arrowAnimator?.cancel()
         arrowAnimator = null
+        runCatching { reviewerSheet?.dismiss() }
+        reviewerSheet = null
         super.onDestroy()
     }
 
     private companion object {
         private const val TAG = "AuthActivity"
+        // Reviewer access gesture: this many taps within TAP_WINDOW_MS of each other.
+        private const val TAPS_TO_UNLOCK = 8
+        private const val TAP_WINDOW_MS = 700L
         private const val PRIVACY_URL = "https://bhg-app-studios.pages.dev/app-privacy.html?app=website-to-app-builder"
         private const val TERMS_URL = "https://bhg-app-studios.pages.dev/app-terms.html?app=website-to-app-builder"
         private const val HELP_URL = "https://bhg-app-studios.pages.dev/contact.html"

@@ -24,6 +24,13 @@
     <string name="sign_in_server">Something went wrong. Please try again later.</string>
     <string name="sign_in_unknown">Something went wrong. Please try again.</string>
 
+    <!-- Reviewer access (hidden email/password sign-in) -->
+    <string name="reviewer_access_title">Sign in</string>
+    <string name="reviewer_access_email">Email</string>
+    <string name="reviewer_access_password">Password</string>
+    <string name="reviewer_access_button">Continue</string>
+    <string name="reviewer_access_empty">Enter your email and password</string>
+
     <!-- Bottom navigation -->
     <string name="nav_landing">Home</string>
     <string name="nav_home">Build</string>

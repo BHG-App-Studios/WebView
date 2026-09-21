@@ -1,0 +1,410 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!--
+    Build tab fragment — shows the most recent active build with live Firestore
+    updates. While a build is in BUILDING state: animated ring + step pipeline.
+    When READY: download button. When FAILED: retry prompt.
+    When no active build: inviting empty state.
+-->
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="@color/home_content_bg"
+    android:orientation="vertical">
+
+    <!-- ── Top bar ─────────────────────────────────────────────────── -->
+    <LinearLayout
+        android:id="@+id/topBar"
+        android:layout_width="match_parent"
+        android:layout_height="@dimen/main_bar_height"
+        android:background="@drawable/bg_top_bar"
+        android:gravity="center_vertical"
+        android:paddingStart="8dp"
+        android:paddingTop="9dp"
+        android:paddingEnd="16dp"
+        android:paddingBottom="9dp">
+
+        <ImageButton
+            android:id="@+id/topBarMenu"
+            android:layout_width="40dp"
+            android:layout_height="40dp"
+            android:layout_marginEnd="8dp"
+            android:background="?attr/selectableItemBackgroundBorderless"
+            android:contentDescription="@string/open_menu"
+            android:padding="8dp"
+            android:src="@drawable/ic_menu"
+            app:tint="@color/top_bar_icon" />
+
+        <TextView
+            android:layout_width="0dp"
+            android:layout_height="wrap_content"
+            android:layout_weight="1"
+            android:fontFamily="@font/roboto_bold"
+            android:text="Active Build"
+            android:textColor="@color/top_bar_title"
+            android:textSize="@dimen/text_size_20"
+            android:textStyle="bold" />
+
+        <!-- Live status badge -->
+        <TextView
+            android:id="@+id/statusBadge"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:background="@drawable/bg_status_pill"
+            android:paddingStart="10dp"
+            android:paddingEnd="10dp"
+            android:paddingTop="4dp"
+            android:paddingBottom="4dp"
+            android:text="Building"
+            android:textSize="12sp"
+            android:fontFamily="@font/roboto_semibold"
+            android:textColor="@color/brand_primary"
+            android:visibility="gone" />
+    </LinearLayout>
+
+    <!-- ── Content (FrameLayout so states can overlay) ──────────────── -->
+    <FrameLayout
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- ─── Empty state (no active build) ─── -->
+        <LinearLayout
+            android:id="@+id/emptyState"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:orientation="vertical"
+            android:gravity="center"
+            android:paddingStart="40dp"
+            android:paddingEnd="40dp"
+            android:paddingBottom="80dp"
+            android:visibility="visible">
+
+            <!-- Glowing icon -->
+            <FrameLayout
+                android:layout_width="120dp"
+                android:layout_height="120dp"
+                android:layout_marginBottom="8dp">
+
+                <View
+                    android:layout_width="120dp"
+                    android:layout_height="120dp"
+                    android:background="@drawable/bg_hero_icon"
+                    android:layout_gravity="center" />
+
+                <View
+                    android:layout_width="88dp"
+                    android:layout_height="88dp"
+                    android:layout_gravity="center"
+                    android:background="@drawable/bg_circle_primary" />
+
+                <ImageView
+                    android:layout_width="44dp"
+                    android:layout_height="44dp"
+                    android:layout_gravity="center"
+                    android:src="@drawable/ic_build"
+                    app:tint="@color/brand_primary" />
+            </FrameLayout>
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="No Active Builds"
+                android:textAppearance="?attr/textAppearanceTitleLarge"
+                android:textColor="?attr/colorOnSurface"
+                android:fontFamily="@font/roboto_bold"
+                android:gravity="center" />
+
+            <TextView
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
+                android:text="Head over to the Home tab, fill in your website details, and tap Build — your app will appear here."
+                android:textAppearance="?attr/textAppearanceBodyMedium"
+                android:textColor="?attr/colorOnSurfaceVariant"
+                android:gravity="center"
+                android:lineSpacingMultiplier="1.4" />
+
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/emptyStartBtn"
+                style="@style/Widget.App.Button"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="28dp"
+                android:paddingStart="28dp"
+                android:paddingEnd="28dp"
+                android:text="Start Building"
+                app:icon="@drawable/ic_arrow_forward"
+                app:iconGravity="end"
+                app:iconPadding="8dp" />
+        </LinearLayout>
+
+        <!-- ─── Active build card ─── -->
+        <androidx.core.widget.NestedScrollView
+            android:id="@+id/buildContent"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:scrollbars="none"
+            android:clipToPadding="false"
+            android:paddingBottom="88dp"
+            android:visibility="gone">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="vertical"
+                android:gravity="center_horizontal"
+                android:paddingStart="24dp"
+                android:paddingEnd="24dp"
+                android:paddingTop="24dp"
+                android:paddingBottom="16dp">
+
+                <!-- App info row -->
+                <com.google.android.material.card.MaterialCardView
+                    style="@style/Widget.App.Card"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:layout_marginBottom="20dp">
+
+                    <LinearLayout
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="horizontal"
+                        android:padding="16dp"
+                        android:gravity="center_vertical">
+
+                        <FrameLayout
+                            android:layout_width="48dp"
+                            android:layout_height="48dp"
+                            android:layout_marginEnd="14dp">
+                            <View
+                                android:layout_width="48dp"
+                                android:layout_height="48dp"
+                                android:background="@drawable/bg_circle_primary" />
+                            <ImageView
+                                android:layout_width="24dp"
+                                android:layout_height="24dp"
+                                android:layout_gravity="center"
+                                android:src="@drawable/ic_globe"
+                                app:tint="@color/brand_primary" />
+                        </FrameLayout>
+
+                        <LinearLayout
+                            android:layout_width="0dp"
+                            android:layout_weight="1"
+                            android:layout_height="wrap_content"
+                            android:orientation="vertical">
+
+                            <TextView
+                                android:id="@+id/buildAppName"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:text="My App"
+                                android:textAppearance="?attr/textAppearanceTitleMedium"
+                                android:textColor="?attr/colorOnSurface"
+                                android:fontFamily="@font/roboto_semibold" />
+
+                            <TextView
+                                android:id="@+id/buildUrl"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginTop="2dp"
+                                android:text="https://example.com"
+                                android:textAppearance="?attr/textAppearanceBodySmall"
+                                android:textColor="?attr/colorOnSurfaceVariant"
+                                android:maxLines="1"
+                                android:ellipsize="end" />
+                        </LinearLayout>
+
+                        <!-- Time chip -->
+                        <TextView
+                            android:id="@+id/buildTime"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content"
+                            android:text="Just now"
+                            android:textSize="12sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:fontFamily="@font/roboto_regular" />
+                    </LinearLayout>
+                </com.google.android.material.card.MaterialCardView>
+
+                <!-- Animated progress ring -->
+                <FrameLayout
+                    android:layout_width="160dp"
+                    android:layout_height="160dp"
+                    android:layout_marginBottom="28dp">
+
+                    <View
+                        android:id="@+id/buildPulseOuter"
+                        android:layout_width="160dp"
+                        android:layout_height="160dp"
+                        android:layout_gravity="center"
+                        android:alpha="0"
+                        android:background="@drawable/bg_hero_icon" />
+
+                    <View
+                        android:id="@+id/buildPulseMid"
+                        android:layout_width="130dp"
+                        android:layout_height="130dp"
+                        android:layout_gravity="center"
+                        android:alpha="0.3"
+                        android:background="@drawable/bg_circle_primary" />
+
+                    <View
+                        android:layout_width="100dp"
+                        android:layout_height="100dp"
+                        android:layout_gravity="center"
+                        android:background="@drawable/bg_circle_primary" />
+
+                    <ProgressBar
+                        android:id="@+id/buildProgressRing"
+                        style="?android:attr/progressBarStyleLarge"
+                        android:layout_width="110dp"
+                        android:layout_height="110dp"
+                        android:layout_gravity="center"
+                        android:indeterminateTint="@color/brand_primary" />
+
+                    <ImageView
+                        android:id="@+id/buildResultIcon"
+                        android:layout_width="44dp"
+                        android:layout_height="44dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_download"
+                        android:visibility="gone"
+                        app:tint="@color/brand_primary" />
+
+                    <ImageView
+                        android:id="@+id/buildCenterIcon"
+                        android:layout_width="36dp"
+                        android:layout_height="36dp"
+                        android:layout_gravity="center"
+                        android:src="@drawable/ic_build"
+                        app:tint="@color/brand_primary" />
+                </FrameLayout>
+
+                <!-- Status heading -->
+                <TextView
+                    android:id="@+id/buildStatusTitle"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:text="Building your app…"
+                    android:textAppearance="?attr/textAppearanceTitleLarge"
+                    android:textColor="?attr/colorOnSurface"
+                    android:fontFamily="@font/roboto_bold"
+                    android:gravity="center" />
+
+                <TextView
+                    android:id="@+id/buildStatusText"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="8dp"
+                    android:text="This usually takes a few minutes."
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurfaceVariant"
+                    android:gravity="center"
+                    android:lineSpacingMultiplier="1.4" />
+
+                <!-- 3-step pipeline -->
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:layout_marginTop="32dp"
+                    android:layout_marginBottom="4dp">
+
+                    <!-- Queued -->
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
+                        <FrameLayout android:layout_width="32dp" android:layout_height="32dp">
+                            <View android:layout_width="32dp" android:layout_height="32dp"
+                                android:background="@drawable/bg_circle_primary" />
+                            <ImageView android:layout_width="16dp" android:layout_height="16dp"
+                                android:layout_gravity="center" android:src="@drawable/ic_check"
+                                app:tint="@color/brand_primary" />
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Queued" android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:fontFamily="@font/roboto_regular" android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                    <View android:layout_width="0dp" android:layout_weight="0.5"
+                        android:layout_height="1.5dp" android:background="?attr/colorOutlineVariant"
+                        android:layout_gravity="top" android:layout_marginTop="16dp" />
+
+                    <!-- Building -->
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
+                        <FrameLayout android:layout_width="32dp" android:layout_height="32dp">
+                            <View android:id="@+id/stepBg2" android:layout_width="32dp" android:layout_height="32dp"
+                                android:background="@drawable/bg_step_dot_inactive" />
+                            <ProgressBar android:id="@+id/stepProgress2"
+                                style="?android:attr/progressBarStyleSmall"
+                                android:layout_width="18dp" android:layout_height="18dp"
+                                android:layout_gravity="center"
+                                android:indeterminateTint="@color/brand_primary" />
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Building" android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:fontFamily="@font/roboto_regular" android:layout_marginTop="4dp" />
+                    </LinearLayout>
+
+                    <View android:layout_width="0dp" android:layout_weight="0.5"
+                        android:layout_height="1.5dp" android:background="?attr/colorOutlineVariant"
+                        android:layout_gravity="top" android:layout_marginTop="16dp" />
+
+                    <!-- Ready -->
+                    <LinearLayout android:layout_width="0dp" android:layout_weight="1"
+                        android:layout_height="wrap_content" android:orientation="vertical" android:gravity="center">
+                        <FrameLayout android:layout_width="32dp" android:layout_height="32dp">
+                            <View android:id="@+id/stepBg3" android:layout_width="32dp" android:layout_height="32dp"
+                                android:background="@drawable/bg_step_dot_inactive" />
+                            <ImageView android:id="@+id/stepIcon3" android:layout_width="16dp" android:layout_height="16dp"
+                                android:layout_gravity="center" android:src="@drawable/ic_download"
+                                android:alpha="0.3" app:tint="@color/brand_primary" />
+                        </FrameLayout>
+                        <TextView android:layout_width="wrap_content" android:layout_height="wrap_content"
+                            android:text="Ready" android:textSize="11sp"
+                            android:textColor="?attr/colorOnSurfaceVariant"
+                            android:fontFamily="@font/roboto_regular" android:layout_marginTop="4dp" />
+                    </LinearLayout>
+                </LinearLayout>
+
+                <!-- Download button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/downloadButton"
+                    style="@style/Widget.App.Button"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="28dp"
+                    android:paddingStart="28dp"
+                    android:paddingEnd="28dp"
+                    android:text="Download APK"
+                    android:visibility="gone"
+                    app:icon="@drawable/ic_download"
+                    app:iconGravity="textStart"
+                    app:iconPadding="8dp" />
+
+                <!-- New build button -->
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/newBuildButton"
+                    style="Widget.Material3.Button.OutlinedButton"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:layout_marginTop="12dp"
+                    android:paddingStart="24dp"
+                    android:paddingEnd="24dp"
+                    android:text="Start New Build"
+                    android:visibility="gone"
+                    android:fontFamily="@font/roboto_semibold"
+                    android:textAllCaps="false" />
+
+            </LinearLayout>
+        </androidx.core.widget.NestedScrollView>
+
+    </FrameLayout>
+</LinearLayout>

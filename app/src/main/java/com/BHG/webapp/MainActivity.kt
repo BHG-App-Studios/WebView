@@ -4,6 +4,8 @@ import android.content.Intent
 import android.os.Bundle
 import android.util.Log
 import android.view.ViewGroup
+import android.widget.Toast
+import androidx.activity.OnBackPressedCallback
 import androidx.activity.enableEdgeToEdge
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.splashscreen.SplashScreen.Companion.installSplashScreen
@@ -38,6 +40,7 @@ class MainActivity : AppCompatActivity() {
     private var firestore: FirebaseFirestore? = null
 
     private var currentTab = 0
+    private var backPressedTime: Long = 0
 
     private lateinit var navButtons: List<Pair<Int, MaterialButton>>
     private val navPillMargin by lazy { resources.getDimensionPixelSize(R.dimen.nav_pill_margin) }
@@ -91,6 +94,7 @@ class MainActivity : AppCompatActivity() {
             currentTab = savedInstanceState.getInt(KEY_TAB, R.id.nav_landing)
         }
         syncNavSelection()
+        setupBackPress()
     }
 
     private fun applyInsets() {
@@ -157,10 +161,10 @@ class MainActivity : AppCompatActivity() {
 
     private fun selectTab(itemId: Int) {
         val fragment: Fragment = when (itemId) {
-            R.id.nav_home -> HomeFragment()
+            R.id.nav_home    -> BuildFragment()
             R.id.nav_history -> HistoryFragment()
             R.id.nav_profile -> ProfileFragment()
-            else -> LandingFragment()
+            else             -> HomeFragment()   // nav_landing = wizard
         }
         currentTab = itemId
         supportFragmentManager.beginTransaction()
@@ -177,6 +181,24 @@ class MainActivity : AppCompatActivity() {
     }
 
     // ---- Drawer / settings ---------------------------------------------------
+
+    private fun setupBackPress() {
+        onBackPressedDispatcher.addCallback(this, object : OnBackPressedCallback(true) {
+            override fun handleOnBackPressed() {
+                if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
+                    binding.drawerLayout.closeDrawer(GravityCompat.START)
+                    return
+                }
+
+                if (backPressedTime + 2000 > System.currentTimeMillis()) {
+                    finish()
+                } else {
+                    Toast.makeText(this@MainActivity, "Press back again to exit", Toast.LENGTH_SHORT).show()
+                }
+                backPressedTime = System.currentTimeMillis()
+            }
+        })
+    }
 
     private fun setupDrawer() {
         val drawer = binding.navigationDrawer

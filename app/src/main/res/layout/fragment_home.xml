@@ -6,22 +6,15 @@
       • ViewPager2    fills remaining space (4 steps)
       • Floating Next/Build button at the bottom
 -->
-<androidx.coordinatorlayout.widget.CoordinatorLayout
+<LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
+    android:orientation="vertical"
     android:background="@color/home_content_bg">
 
     <!-- ── Top bar ───────────────────────────────────────────────────── -->
-    <com.google.android.material.appbar.AppBarLayout
-        android:id="@+id/appBarLayout"
-        android:layout_width="match_parent"
-        android:layout_height="wrap_content"
-        android:background="@drawable/bg_top_bar"
-        android:stateListAnimator="@null"
-        app:elevation="0dp"
-        app:liftOnScroll="false">
 
         <LinearLayout
             android:id="@+id/topBar"
@@ -71,53 +64,20 @@
                 android:textColor="@color/top_bar_title"
                 android:textSize="@dimen/text_size_20"
                 android:textStyle="bold" />
-
-            <!-- Step indicator dots (4 dots) -->
-            <LinearLayout
-                android:id="@+id/stepIndicator"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:gravity="center_vertical">
-
-                <View
-                    android:id="@+id/dot1"
-                    android:layout_width="22dp"
-                    android:layout_height="8dp"
-                    android:layout_marginEnd="5dp"
-                    android:background="@drawable/bg_step_dot_active" />
-
-                <View
-                    android:id="@+id/dot2"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginEnd="5dp"
-                    android:background="@drawable/bg_step_dot_inactive" />
-
-                <View
-                    android:id="@+id/dot3"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:layout_marginEnd="5dp"
-                    android:background="@drawable/bg_step_dot_inactive" />
-
-                <View
-                    android:id="@+id/dot4"
-                    android:layout_width="8dp"
-                    android:layout_height="8dp"
-                    android:background="@drawable/bg_step_dot_inactive" />
-            </LinearLayout>
         </LinearLayout>
-    </com.google.android.material.appbar.AppBarLayout>
 
-    <!-- ── ViewPager2 (4 wizard steps) ─────────────────────────────── -->
-    <androidx.viewpager2.widget.ViewPager2
-        android:id="@+id/wizardPager"
+    <FrameLayout
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:paddingBottom="88dp"
-        android:clipToPadding="false"
-        app:layout_behavior="@string/appbar_scrolling_view_behavior" />
+        android:layout_height="0dp"
+        android:layout_weight="1">
+
+        <!-- ── ViewPager2 (3 wizard steps) ─────────────────────────────── -->
+        <androidx.viewpager2.widget.ViewPager2
+            android:id="@+id/wizardPager"
+            android:layout_width="match_parent"
+            android:layout_height="match_parent"
+            android:paddingBottom="88dp"
+            android:clipToPadding="false" />
 
     <!-- ── Floating Next button (bottom-right) ──────────────────────── -->
     <com.google.android.material.button.MaterialButton
@@ -127,7 +87,7 @@
         android:layout_height="52dp"
         android:layout_gravity="bottom|end"
         android:layout_marginEnd="20dp"
-        android:layout_marginBottom="100dp"
+        android:layout_marginBottom="112dp"
         android:paddingStart="24dp"
         android:paddingEnd="24dp"
         android:text="Next"
@@ -135,5 +95,6 @@
         app:icon="@drawable/ic_arrow_forward"
         app:iconGravity="end"
         app:iconPadding="8dp" />
+    </FrameLayout>
 
-</androidx.coordinatorlayout.widget.CoordinatorLayout>
+</LinearLayout>

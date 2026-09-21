@@ -173,10 +173,27 @@ class HomeFragment : Fragment() {
     private fun setupTopBar() {
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.topBarBack.setOnClickListener { goBack() }
+
+        val currentMode = ThemePrefs.getMode(requireContext())
+        updateThemeToggleIcon(currentMode)
+        
+        binding.topBarThemeToggle.setOnClickListener {
+            val mode = ThemePrefs.getMode(requireContext())
+            val newMode = if (mode == ThemePrefs.DARK) ThemePrefs.LIGHT else ThemePrefs.DARK
+            ThemePrefs.setMode(requireContext(), newMode)
+            updateThemeToggleIcon(newMode)
+        }
+
         // onPageSelected doesn't fire for position 0, so set the initial bar state
         // explicitly — otherwise the back button keeps its XML visibility and the
         // title starts indented on first render.
         updateTopBarForStep(binding.wizardPager.currentItem)
+    }
+
+    private fun updateThemeToggleIcon(mode: String) {
+        val isDark = mode == ThemePrefs.DARK || (mode == ThemePrefs.SYSTEM && 
+            (resources.configuration.uiMode and android.content.res.Configuration.UI_MODE_NIGHT_MASK) == android.content.res.Configuration.UI_MODE_NIGHT_YES)
+        binding.topBarThemeToggle.setImageResource(if (isDark) R.drawable.ic_light_mode else R.drawable.ic_dark_mode)
     }
 
     private fun setupNextButton() {

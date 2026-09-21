@@ -110,11 +110,13 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content"
                         android:layout_marginTop="10dp"
+                        android:saveEnabled="false"
                         app:selectionRequired="true"
                         app:singleSelection="true">
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/themeSystem"
+                            android:saveEnabled="false"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -126,6 +128,7 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/themeLight"
+                            android:saveEnabled="false"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"
@@ -137,6 +140,7 @@
 
                         <com.google.android.material.button.MaterialButton
                             android:id="@+id/themeDark"
+                            android:saveEnabled="false"
                             style="@style/Widget.Material3.Button.OutlinedButton"
                             android:layout_width="0dp"
                             android:layout_height="wrap_content"

@@ -81,7 +81,7 @@
             android:layout_height="wrap_content"
             android:hint="Website URL"
             app:startIconDrawable="@drawable/ic_globe"
-            app:startIconTint="?attr/colorPrimary">
+            app:startIconTint="?attr/colorOnSurfaceVariant">
 
             <com.google.android.material.textfield.TextInputEditText
                 android:id="@+id/entryUrlInput"

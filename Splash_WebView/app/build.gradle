@@ -2,6 +2,18 @@ plugins {
     alias(libs.plugins.android.application)
 }
 
+// Release signing is driven by a keystore.properties file the CI workflow
+// writes next to this module (app/keystore.properties) after fetching the
+// signing material from the Worker. It is deliberately NOT committed and NOT
+// echoed to logs. When the file is absent (local debug builds, or a release
+// built without signing material) the release type falls back to unsigned.
+def keystorePropsFile = rootProject.file('app/keystore.properties')
+def keystoreProps = new Properties()
+def hasKeystore = keystorePropsFile.exists()
+if (hasKeystore) {
+    keystorePropsFile.withInputStream { keystoreProps.load(it) }
+}
+
 android {
     namespace 'com.BHG.webview'
     compileSdk 37
@@ -16,11 +28,35 @@ android {
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
+    signingConfigs {
+        release {
+            if (hasKeystore) {
+                storeFile file(keystoreProps['storeFile'])
+                storePassword keystoreProps['storePassword']
+                keyAlias keystoreProps['keyAlias']
+                keyPassword keystoreProps['keyPassword']
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled true
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
+            // Only attach the signing config when the properties file was
+            // provided; otherwise Gradle would fail configuring an empty config.
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
+        }
+        debug {
+            // A debug build normally uses Android's auto debug keystore. When
+            // the CI pipeline provides a custom keystore (debug + custom
+            // signing), sign the debug build with it instead.
+            if (hasKeystore) {
+                signingConfig signingConfigs.release
+            }
         }
     }
 

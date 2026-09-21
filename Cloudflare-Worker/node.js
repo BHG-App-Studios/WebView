@@ -99,6 +99,14 @@ export default {
           packageName = packageNameFromHost(siteUrl.hostname);
         }
 
+        // Build type + output format + signing mode. Validated here; the
+        // secrets (keystore bytes / passwords) never travel in the GitHub
+        // dispatch payload - they are stashed in R2 and fetched by the runner.
+        const signing = await resolveSigning(body, buildId, packageName, env);
+        if (signing.error) {
+          return jsonResponse({ error: signing.error }, 400, corsHeaders);
+        }
+
         // Customisation: every AppConfig.kt constant
         const resolved = resolveOptions(body);
         if (resolved.error) {
@@ -130,7 +138,13 @@ export default {
           // Carry the resolved package name to the upload handler so it can
           // overwrite the caller's placeholder ("auto") once the build lands.
           UPLOAD_WEBHOOK_URL: `${uploadWebhookUrl}&pkg=${encodeURIComponent(packageName)}`,
-          STATUS_WEBHOOK_URL: statusWebhookUrl
+          STATUS_WEBHOOK_URL: statusWebhookUrl,
+          // Build type / output / signing. All non-secret: the runner fetches
+          // the actual keystore + passwords from SIGNING_FETCH_URL (secret-gated).
+          BUILD_TYPE: signing.buildType,             // "debug" | "release"
+          OUTPUTS: signing.outputs,                  // ["apk"] | ["aab"] | ["apk","aab"]
+          SIGNING_MODE: signing.signingMode,         // "auto" | "custom"
+          SIGNING_FETCH_URL: `${url.origin}/api/signing/${buildId}?uid=${uidParam}`
         };
 
         let ghDispatched = false;
@@ -155,6 +169,9 @@ export default {
           app_name: appName,
           package_name: packageName,
           remove_permissions: removal.permissions,
+          build_type: signing.buildType,
+          outputs: signing.outputs,
+          signing_mode: signing.signingMode,
           download_url: downloadUrl,
           status_url: `${url.origin}/api/status/${buildId}`,
           message: ghMessage,
@@ -177,53 +194,135 @@ export default {
         }
 
         let buildId = path.replace("/api/upload/", "").trim();
-        if (buildId.endsWith(".apk")) {
-          buildId = buildId.replace(".apk", "");
+        buildId = buildId.replace(/\.(apk|aab|zip)$/i, "");
+
+        // What kind of artifact is being uploaded. Defaults to "apk" so the
+        // existing debug path keeps working unchanged.
+        //   apk           -> apks/{buildId}.apk           (public download)
+        //   aab           -> aabs/{buildId}.aab           (public download)
+        //   keystore      -> downloads/{buildId}.keystore.zip (owner-only)
+        //   package-key   -> keystores/{package}.jks       (reuse store)
+        const type = (url.searchParams.get("type") || "apk").toLowerCase();
+
+        // package-key: the runner persisting a freshly generated per-package
+        // keystore for reuse on future builds. `pkgkey` carries the package.
+        if (type === "package-key") {
+          const pkgKey = url.searchParams.get("pkgkey");
+          if (!pkgKey) return jsonResponse({ error: "pkgkey required" }, 400, corsHeaders);
+          await env.BUCKET.put(`keystores/${pkgKey}.jks`, request.body, {
+            httpMetadata: { contentType: "application/octet-stream" },
+            customMetadata: { uploadedAt: new Date().toISOString() }
+          });
+          return jsonResponse({ success: true, stored: `keystores/${pkgKey}.jks` }, 200, corsHeaders);
         }
 
-        const objectKey = `apks/${buildId}.apk`;
+        const spec = {
+          apk:      { key: `apks/${buildId}.apk`,               ct: "application/vnd.android.package-archive", ext: "apk" },
+          aab:      { key: `aabs/${buildId}.aab`,               ct: "application/octet-stream",                ext: "aab" },
+          keystore: { key: `downloads/${buildId}.keystore.zip`, ct: "application/zip",                         ext: "keystore.zip" }
+        }[type];
+        if (!spec) return jsonResponse({ error: `Unknown upload type '${type}'` }, 400, corsHeaders);
 
-        // Stream body straight into R2 storage
-        const putResult = await env.BUCKET.put(objectKey, request.body, {
+        const putResult = await env.BUCKET.put(spec.key, request.body, {
           httpMetadata: {
-            contentType: "application/vnd.android.package-archive",
-            contentDisposition: `attachment; filename="${buildId}.apk"`
+            contentType: spec.ct,
+            contentDisposition: `attachment; filename="${buildId}.${spec.ext}"`
           },
-          customMetadata: {
-            uploadedAt: new Date().toISOString()
-          }
+          customMetadata: { uploadedAt: new Date().toISOString() }
         });
 
-        // Flip the Firestore doc to READY so the app's live listener reacts
-        // instantly. Best-effort: a failure here must not fail the upload (the
-        // APK is already stored and the app can still poll as a fallback).
+        // Update the Firestore doc so the app's live listener reacts. Each
+        // artifact type updates its own field(s). Best-effort: a failure here
+        // must not fail the upload (the object is already stored).
         const uid = url.searchParams.get("uid");
         if (uid) {
           try {
-            const readyFields = {
-              status: "READY",
-              sizeBytes: putResult && putResult.size ? putResult.size : 0,
-              downloadUrl: `${url.origin}/download/${buildId}.apk`
-            };
-            // Replace the caller's placeholder package name ("auto") with the
-            // real one resolved at dispatch and passed through the webhook URL.
-            const pkg = url.searchParams.get("pkg");
-            if (pkg) {
-              readyFields.packageName = pkg;
+            const fields = {};
+            if (type === "apk") {
+              // The APK is the primary artifact: it flips the build to READY.
+              fields.status = "READY";
+              fields.sizeBytes = putResult && putResult.size ? putResult.size : 0;
+              fields.downloadUrl = `${url.origin}/download/${buildId}.apk`;
+              // Replace the caller's placeholder package name ("auto") with the
+              // real one resolved at dispatch and passed through the webhook URL.
+              const pkg = url.searchParams.get("pkg");
+              if (pkg) fields.packageName = pkg;
+            } else if (type === "aab") {
+              // For AAB-only release builds, the AAB flips the build to READY.
+              fields.status = "READY";
+              fields.aabDownloadUrl = `${url.origin}/download/${buildId}.aab`;
+            } else if (type === "keystore") {
+              fields.keystoreAvailable = true;
+              fields.keystoreDownloadUrl = `${url.origin}/api/keystore/${buildId}`;
             }
-            await updateBuildDoc(env, uid, buildId, readyFields);
+            if (Object.keys(fields).length) {
+              await updateBuildDoc(env, uid, buildId, fields);
+            }
           } catch (e) {
-            console.log(`Firestore READY update failed for ${buildId}: ${e.message}`);
+            console.log(`Firestore update failed for ${buildId} (${type}): ${e.message}`);
           }
         }
 
         return jsonResponse({
           success: true,
-          message: "APK stored in R2 successfully",
+          message: `${type} stored in R2 successfully`,
           build_id: buildId,
-          object_key: objectKey,
-          download_url: `${url.origin}/download/${buildId}.apk`
+          object_key: spec.key
         }, 200, corsHeaders);
+      }
+
+      // ----------------------------------------------------
+      // 2c. RUNNER FETCHES SIGNING MATERIAL: GET /api/signing/:buildId
+      //     Secret-gated. Returns the keystore + passwords the runner needs,
+      //     plus - for auto mode - any existing per-package keystore so the
+      //     app can be updated later with the same key. Never public.
+      // ----------------------------------------------------
+      if (method === "GET" && path.startsWith("/api/signing/")) {
+        const authKey = request.headers.get("X-Build-Secret") || url.searchParams.get("secret");
+        if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
+          return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
+        }
+        const buildId = path.replace("/api/signing/", "").trim();
+
+        const obj = await env.BUCKET.get(`signing/${buildId}/bundle.json`);
+        if (!obj) return jsonResponse({ error: "No signing material for this build" }, 404, corsHeaders);
+        const bundle = JSON.parse(await obj.text());
+
+        // Auto mode: attach an existing per-package keystore if we have one, so
+        // the runner reuses it instead of generating a new (incompatible) key.
+        if (bundle.mode === "auto" && bundle.packageName) {
+          const existing = await env.BUCKET.get(`keystores/${bundle.packageName}.jks`);
+          const creds = await env.BUCKET.get(`keystores/${bundle.packageName}.json`);
+          if (existing && creds) {
+            const buf = await existing.arrayBuffer();
+            bundle.existingKeystoreB64 = bytesToBase64(new Uint8Array(buf));
+            bundle.existingCreds = JSON.parse(await creds.text());
+          }
+        }
+
+        return jsonResponse(bundle, 200, corsHeaders);
+      }
+
+      // ----------------------------------------------------
+      // 2d. RUNNER PERSISTS AUTO KEYSTORE CREDS: POST /api/signing/:buildId/creds
+      //     Secret-gated. Stores keystores/{package}.json so future auto builds
+      //     of the same package reuse the key. Paired with the package-key
+      //     upload above (which stores the .jks bytes).
+      // ----------------------------------------------------
+      if (method === "POST" && /^\/api\/signing\/[^/]+\/creds$/.test(path)) {
+        const authKey = request.headers.get("X-Build-Secret") || url.searchParams.get("secret");
+        if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
+          return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
+        }
+        const body = await request.json().catch(() => ({}));
+        const pkg = String(body.package || "").trim();
+        if (!pkg) return jsonResponse({ error: "package required" }, 400, corsHeaders);
+        await env.BUCKET.put(`keystores/${pkg}.json`, JSON.stringify({
+          storePassword: body.store_password,
+          keyAlias: body.key_alias,
+          keyPassword: body.key_password
+        }), { httpMetadata: { contentType: "application/json" } });
+        return jsonResponse({ success: true }, 200, corsHeaders);
       }
 
       // ----------------------------------------------------
@@ -260,30 +359,83 @@ export default {
       }
 
       // ----------------------------------------------------
-      // 3. PUBLIC DOWNLOAD: GET /download/:buildId.apk
+      // 3. PUBLIC DOWNLOAD: GET /download/:buildId.apk  (or .aab)
       // ----------------------------------------------------
       if (method === "GET" && path.startsWith("/download/")) {
         let fileName = path.replace("/download/", "").trim();
-        if (!fileName.endsWith(".apk")) {
+        // Default to .apk to keep old links working; .aab is served from its
+        // own R2 prefix.
+        const isAab = fileName.endsWith(".aab");
+        if (!fileName.endsWith(".apk") && !isAab) {
           fileName += ".apk";
         }
-        const objectKey = `apks/${fileName}`;
+        const objectKey = isAab ? `aabs/${fileName}` : `apks/${fileName}`;
 
         const file = await env.BUCKET.get(objectKey);
 
         if (!file) {
+          const idOnly = fileName.replace(/\.(apk|aab)$/, "");
           return new Response(
-            `APK '${fileName}' is still compiling or does not exist. Please check /api/status/${fileName.replace('.apk', '')}`,
+            `'${fileName}' is still compiling or does not exist. Please check /api/status/${idOnly}`,
             { status: 404, headers: { "Content-Type": "text/plain" } }
           );
         }
 
         const headers = new Headers();
         file.writeHttpMetadata(headers);
-        headers.set("Content-Type", "application/vnd.android.package-archive");
+        headers.set("Content-Type", isAab
+          ? "application/octet-stream"
+          : "application/vnd.android.package-archive");
         headers.set("Content-Disposition", `attachment; filename="${fileName}"`);
         headers.set("Cache-Control", "public, max-age=3600");
 
+        return new Response(file.body, { headers });
+      }
+
+      // ----------------------------------------------------
+      // 3b. OWNER-ONLY KEYSTORE DOWNLOAD: GET /api/keystore/:buildId
+      //     Auto-generated keystores are the user's signing key - anyone with
+      //     them can ship updates as that app. So this is NOT public like the
+      //     APK route: it requires the owner's Firebase ID token (Bearer), and
+      //     the build must belong to that uid.
+      // ----------------------------------------------------
+      if (method === "GET" && path.startsWith("/api/keystore/")) {
+        const buildId = path.replace("/api/keystore/", "").replace(/\.zip$/i, "").trim();
+
+        if (!env.FIREBASE_PROJECT_ID || !env.FIREBASE_SERVICE_ACCOUNT) {
+          return jsonResponse({ error: "Server auth not configured" }, 503, corsHeaders);
+        }
+        const authHeader = request.headers.get("Authorization") || "";
+        const m = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (!m) return jsonResponse({ error: "Missing Authorization bearer token" }, 401, corsHeaders);
+
+        let uid;
+        try {
+          const claims = await verifyFirebaseIdToken(m[1].trim(), env.FIREBASE_PROJECT_ID);
+          uid = claims.sub;
+        } catch (e) {
+          return jsonResponse({ error: `Invalid ID token: ${e.message}` }, 401, corsHeaders);
+        }
+        if (!uid) return jsonResponse({ error: "Token has no subject" }, 401, corsHeaders);
+
+        // Ownership: the build doc must exist under THIS uid.
+        try {
+          const accessToken = await getServiceAccountToken(env);
+          const doc = await fetchBuildDoc(env.FIREBASE_PROJECT_ID, accessToken, uid, buildId);
+          if (!doc) return jsonResponse({ error: "Not found" }, 404, corsHeaders);
+        } catch (e) {
+          return jsonResponse({ error: `Authorization check failed: ${e.message}` }, 502, corsHeaders);
+        }
+
+        const file = await env.BUCKET.get(`downloads/${buildId}.keystore.zip`);
+        if (!file) return jsonResponse({ error: "No keystore for this build" }, 404, corsHeaders);
+
+        const headers = new Headers();
+        file.writeHttpMetadata(headers);
+        headers.set("Content-Type", "application/zip");
+        headers.set("Content-Disposition", `attachment; filename="${buildId}-keystore.zip"`);
+        // Never cache a signing key at any shared layer.
+        headers.set("Cache-Control", "no-store");
         return new Response(file.body, { headers });
       }
 
@@ -607,6 +759,120 @@ function resolveOptions(body) {
 }
 
 // --------------------------------------------------------
+// Build type / output / signing resolution
+// --------------------------------------------------------
+//
+// R2 layout (all under the same bucket):
+//   apks/{buildId}.apk            - the built APK (public download, unchanged)
+//   aabs/{buildId}.aab            - the built AAB, when requested
+//   signing/{buildId}/bundle.json - short-lived signing material the runner
+//                                   fetches (custom keystore + passwords, OR a
+//                                   pointer telling the runner to auto-generate)
+//   keystores/{package}.jks       - the per-package auto keystore, retained so
+//                                   future builds of the same app reuse the key
+//   keystores/{package}.json      - its passwords/alias, retained alongside
+//   downloads/{buildId}.keystore.zip - the user-downloadable bundle (auto mode)
+//
+// A keystore password can never ride in the GitHub dispatch payload (it is
+// echoed to the Action log). So the payload carries only a fetch URL; the
+// runner pulls the bundle over HTTPS with the shared WORKER_BUILD_SECRET.
+
+const VALID_OUTPUTS = new Set(["apk", "aab"]);
+
+/**
+ * Validates build type, outputs and signing choice, and - for a custom
+ * keystore - stashes the uploaded keystore + passwords in R2 so the runner can
+ * fetch them without them ever touching the dispatch payload.
+ *
+ * @returns {{buildType, outputs, signingMode}|{error}}
+ */
+async function resolveSigning(body, buildId, packageName, env) {
+  // Build type ----------------------------------------------------------
+  const buildType = String(body.build_type || "debug").trim().toLowerCase();
+  if (buildType !== "debug" && buildType !== "release") {
+    return { error: "build_type must be 'debug' or 'release'" };
+  }
+
+  // Outputs -------------------------------------------------------------
+  // Debug is always a single APK. Release honours the caller's choice.
+  let outputs;
+  if (buildType === "debug") {
+    outputs = ["apk"];
+  } else {
+    const raw = Array.isArray(body.outputs) ? body.outputs
+      : (typeof body.outputs === "string" && body.outputs.trim() !== ""
+          ? body.outputs.split(",") : ["apk"]);
+    outputs = [...new Set(raw.map((o) => String(o).trim().toLowerCase()).filter(Boolean))];
+    const bad = outputs.filter((o) => !VALID_OUTPUTS.has(o));
+    if (bad.length) return { error: `Invalid output(s): ${bad.join(", ")}. Use 'apk' and/or 'aab'.` };
+    if (outputs.length === 0) outputs = ["apk"];
+  }
+
+  // Signing mode --------------------------------------------------------
+  const signingMode = String(body.signing_mode || "auto").trim().toLowerCase();
+  if (signingMode !== "auto" && signingMode !== "custom") {
+    return { error: "signing_mode must be 'auto' or 'custom'" };
+  }
+
+  // Stash the per-build signing material in R2 for the runner to fetch.
+  let bundle;
+  if (signingMode === "custom") {
+    const ks = validateCustomKeystore(body);
+    if (ks.error) return { error: ks.error };
+    bundle = {
+      mode: "custom",
+      buildType,
+      outputs,
+      keystoreB64: ks.keystoreB64,
+      storePassword: ks.storePassword,
+      keyAlias: ks.keyAlias,
+      keyPassword: ks.keyPassword
+    };
+  } else {
+    // Auto: the runner reuses keystores/{package}.jks if it exists, else
+    // generates one and uploads it back (see the workflow). The password file
+    // lives next to it and is what makes reuse possible.
+    bundle = { mode: "auto", buildType, outputs, packageName };
+  }
+
+  try {
+    await env.BUCKET.put(`signing/${buildId}/bundle.json`, JSON.stringify(bundle), {
+      httpMetadata: { contentType: "application/json" }
+    });
+  } catch (e) {
+    return { error: `Could not stage signing material: ${e.message}` };
+  }
+
+  return { buildType, outputs, signingMode };
+}
+
+/**
+ * Validates a caller-supplied custom keystore payload. The keystore itself is
+ * base64; passwords are plain strings sent over HTTPS (never stored long-term).
+ */
+function validateCustomKeystore(body) {
+  const keystoreB64 = typeof body.keystore_b64 === "string" ? body.keystore_b64.trim() : "";
+  if (!keystoreB64) return { error: "A custom keystore file is required for custom signing" };
+  // Rough size guard: base64 of a keystore is small; reject anything > ~5 MB.
+  if (keystoreB64.length > 5 * 1024 * 1024) return { error: "Keystore file is too large" };
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(keystoreB64)) return { error: "Keystore must be base64-encoded" };
+
+  const storePassword = typeof body.store_password === "string" ? body.store_password : "";
+  const keyAlias = typeof body.key_alias === "string" ? body.key_alias.trim() : "";
+  const keyPassword = typeof body.key_password === "string" ? body.key_password : "";
+
+  if (!storePassword) return { error: "store_password is required for a custom keystore" };
+  if (!keyAlias) return { error: "key_alias is required for a custom keystore" };
+  // Android allows the key password to equal the store password; default it.
+  return {
+    keystoreB64,
+    storePassword,
+    keyAlias,
+    keyPassword: keyPassword || storePassword
+  };
+}
+
+// --------------------------------------------------------
 // GitHub Actions Workflow Trigger
 // --------------------------------------------------------
 async function triggerGitHubAction(env, buildConfig) {
@@ -642,7 +908,11 @@ async function triggerGitHubAction(env, buildConfig) {
         constants: buildConfig.CONSTANTS,
         remove_permissions: buildConfig.REMOVE_PERMISSIONS,
         upload_webhook_url: buildConfig.UPLOAD_WEBHOOK_URL,
-        status_webhook_url: buildConfig.STATUS_WEBHOOK_URL
+        status_webhook_url: buildConfig.STATUS_WEBHOOK_URL,
+        build_type: buildConfig.BUILD_TYPE,
+        outputs: buildConfig.OUTPUTS,
+        signing_mode: buildConfig.SIGNING_MODE,
+        signing_fetch_url: buildConfig.SIGNING_FETCH_URL
       }
     })
   });
@@ -962,6 +1232,16 @@ function bytesToBase64url(bytes) {
   let bin = "";
   for (let i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
   return btoa(bin).replace(/\+/g, "-").replace(/\//g, "_").replace(/=+$/, "");
+}
+
+/** Standard base64 (not url-safe): used to ship a keystore's raw bytes as JSON. */
+function bytesToBase64(bytes) {
+  let bin = "";
+  const chunk = 0x8000;
+  for (let i = 0; i < bytes.length; i += chunk) {
+    bin += String.fromCharCode.apply(null, bytes.subarray(i, i + chunk));
+  }
+  return btoa(bin);
 }
 
 function utf8(bytes) {

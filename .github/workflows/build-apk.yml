@@ -86,42 +86,225 @@ jobs:
           grep -n "namespace\|applicationId" app/build.gradle
           grep -n "app_name" app/src/main/res/values/strings.xml
 
-      - name: Build Debug APK
+      # ---------------------------------------------------------------------
+      # Signing material. Passwords and keystore bytes never travel in the
+      # dispatch payload (it is echoed to the log). Instead the runner fetches
+      # them from the Worker's secret-gated /api/signing endpoint and writes
+      # app/keystore.properties, which build.gradle reads. That file, the
+      # fetched bundle and the .jks are all confined to the runner and deleted
+      # before the job ends.
+      #
+      # Modes:
+      #   debug  + auto    -> no signing config; Gradle's debug keystore is used
+      #   debug  + custom  -> sign the debug build with the uploaded keystore
+      #   release + auto   -> reuse keystores/{package}.jks if it exists, else
+      #                       generate one with keytool and upload it back
+      #   release + custom -> sign the release build with the uploaded keystore
+      # ---------------------------------------------------------------------
+      - name: Prepare signing material
+        id: signing
         working-directory: ./Splash_WebView
+        env:
+          SIGNING_FETCH_URL: ${{ github.event.client_payload.signing_fetch_url }}
+          BUILD_TYPE: ${{ github.event.client_payload.build_type }}
+          SIGNING_MODE: ${{ github.event.client_payload.signing_mode }}
+          PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
+          BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
+        run: |
+          BUILD_TYPE="${BUILD_TYPE:-debug}"
+          SIGNING_MODE="${SIGNING_MODE:-auto}"
+          echo "build_type=$BUILD_TYPE"   >> "$GITHUB_OUTPUT"
+          echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
+
+          # Debug + auto: nothing to do; the debug keystore signs it.
+          if [ "$BUILD_TYPE" = "debug" ] && [ "$SIGNING_MODE" = "auto" ]; then
+            echo "Debug build with auto (debug) keystore - no custom signing."
+            echo "generated_keystore=false" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ -z "$SIGNING_FETCH_URL" ]; then
+            echo "::error::signing_fetch_url missing from dispatch payload"
+            exit 1
+          fi
+
+          # Pull the signing bundle (never printed).
+          curl -s -f -H "X-Build-Secret: $BUILD_SECRET" "$SIGNING_FETCH_URL" -o /tmp/signing.json || {
+            echo "::error::Could not fetch signing material"; exit 1; }
+
+          KS_PATH="$PWD/app/release.jks"
+          GENERATED=false
+
+          if [ "$SIGNING_MODE" = "custom" ]; then
+            # Custom keystore: decode bytes + read passwords from the bundle.
+            jq -r '.keystoreB64' /tmp/signing.json | base64 -d > "$KS_PATH"
+            STORE_PW=$(jq -r '.storePassword' /tmp/signing.json)
+            KEY_ALIAS=$(jq -r '.keyAlias' /tmp/signing.json)
+            KEY_PW=$(jq -r '.keyPassword' /tmp/signing.json)
+          else
+            # Release + auto. Reuse the per-package keystore if the Worker
+            # attached one; otherwise generate a fresh keystore and upload it
+            # back so future updates of this package reuse the same key.
+            HAS_EXISTING=$(jq -r 'has("existingKeystoreB64")' /tmp/signing.json)
+            if [ "$HAS_EXISTING" = "true" ]; then
+              echo "Reusing existing keystore for $PACKAGE_NAME"
+              jq -r '.existingKeystoreB64' /tmp/signing.json | base64 -d > "$KS_PATH"
+              STORE_PW=$(jq -r '.existingCreds.storePassword' /tmp/signing.json)
+              KEY_ALIAS=$(jq -r '.existingCreds.keyAlias' /tmp/signing.json)
+              KEY_PW=$(jq -r '.existingCreds.keyPassword' /tmp/signing.json)
+            else
+              echo "Generating a new keystore for $PACKAGE_NAME"
+              STORE_PW=$(openssl rand -base64 24 | tr -d '/+=' | head -c 24)
+              KEY_PW="$STORE_PW"
+              KEY_ALIAS="upload"
+              GENERATED=true
+              keytool -genkeypair -v \
+                -keystore "$KS_PATH" \
+                -alias "$KEY_ALIAS" \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$STORE_PW" -keypass "$KEY_PW" \
+                -dname "CN=${PACKAGE_NAME:-app}, OU=WebCraft, O=WebCraft, C=US"
+            fi
+          fi
+
+          # build.gradle reads this. Written on the runner, never logged.
+          cat > app/keystore.properties <<EOF
+          storeFile=release.jks
+          storePassword=$STORE_PW
+          keyAlias=$KEY_ALIAS
+          keyPassword=$KEY_PW
+          EOF
+
+          # Hand credentials to later steps via env-file (masked), not stdout.
+          {
+            echo "STORE_PW=$STORE_PW"
+            echo "KEY_ALIAS=$KEY_ALIAS"
+            echo "KEY_PW=$KEY_PW"
+          } >> "$GITHUB_ENV"
+          echo "::add-mask::$STORE_PW"
+          echo "::add-mask::$KEY_PW"
+          echo "generated_keystore=$GENERATED" >> "$GITHUB_OUTPUT"
+
+      - name: Build the app
+        working-directory: ./Splash_WebView
+        env:
+          BUILD_TYPE: ${{ steps.signing.outputs.build_type }}
+          OUTPUTS_JSON: ${{ toJson(github.event.client_payload.outputs) }}
         run: |
           chmod +x gradlew
-          ./gradlew assembleDebug --no-daemon
+          # Determine which Gradle tasks to run from build_type + outputs.
+          OUTPUTS=$(echo "$OUTPUTS_JSON" | jq -r 'if type=="array" then join(" ") else "apk" end')
+          [ -z "$OUTPUTS" ] && OUTPUTS="apk"
+          echo "Building type=$BUILD_TYPE outputs=$OUTPUTS"
 
-      - name: Upload APK to Cloudflare Worker
+          TASKS=""
+          if [ "$BUILD_TYPE" = "release" ]; then
+            case "$OUTPUTS" in
+              *apk*) TASKS="$TASKS assembleRelease" ;;
+            esac
+            case "$OUTPUTS" in
+              *aab*) TASKS="$TASKS bundleRelease" ;;
+            esac
+          else
+            TASKS="assembleDebug"
+          fi
+          echo "Gradle tasks:$TASKS"
+          ./gradlew $TASKS --no-daemon
+
+      - name: Upload artifacts to Cloudflare Worker
         env:
           UPLOAD_WEBHOOK: ${{ github.event.client_payload.upload_webhook_url }}
+          BUILD_TYPE: ${{ steps.signing.outputs.build_type }}
+          OUTPUTS_JSON: ${{ toJson(github.event.client_payload.outputs) }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
           if [ -z "$UPLOAD_WEBHOOK" ]; then
             echo "::error::upload_webhook_url missing from the dispatch payload"
             exit 1
           fi
+          OUTPUTS=$(echo "$OUTPUTS_JSON" | jq -r 'if type=="array" then join(" ") else "apk" end')
+          [ -z "$OUTPUTS" ] && OUTPUTS="apk"
 
-          APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
-          if [ -z "$APK_PATH" ]; then
-            echo "::error::No APK produced by the build"
-            exit 1
+          # Add a &type= to the webhook URL (it already has ?uid=&pkg=).
+          put_artifact () { # $1=file  $2=type  $3=content-type
+            echo "Uploading $2: $1 ($(stat -c%s "$1") bytes)"
+            CODE=$(curl -s -o /tmp/up.txt -w "%{http_code}" \
+              -X PUT "${UPLOAD_WEBHOOK}&type=$2" \
+              -H "X-Build-Secret: $BUILD_SECRET" \
+              -H "Content-Type: $3" \
+              --data-binary @"$1")
+            echo "Worker responded $CODE"; cat /tmp/up.txt; echo
+            if [ "$CODE" != "200" ]; then echo "::error::$2 upload failed ($CODE)"; exit 1; fi
+          }
+
+          # APK (debug always; release when apk requested)
+          if [ "$BUILD_TYPE" = "debug" ] || echo "$OUTPUTS" | grep -q apk; then
+            APK_PATH=$(find Splash_WebView/app/build/outputs/apk -name "*.apk" | head -n 1)
+            if [ -z "$APK_PATH" ]; then echo "::error::No APK produced"; exit 1; fi
+            put_artifact "$APK_PATH" apk "application/vnd.android.package-archive"
           fi
-          echo "Uploading $APK_PATH ($(stat -c%s "$APK_PATH") bytes)"
 
-          HTTP_CODE=$(curl -s -o /tmp/upload_response.txt -w "%{http_code}" \
-            -X PUT "$UPLOAD_WEBHOOK" \
+          # AAB (release + aab requested)
+          if [ "$BUILD_TYPE" = "release" ] && echo "$OUTPUTS" | grep -q aab; then
+            AAB_PATH=$(find Splash_WebView/app/build/outputs/bundle -name "*.aab" | head -n 1)
+            if [ -z "$AAB_PATH" ]; then echo "::error::No AAB produced"; exit 1; fi
+            put_artifact "$AAB_PATH" aab "application/octet-stream"
+          fi
+
+      # Only for auto-generated keystores: persist the .jks + creds for reuse,
+      # and package a downloadable zip (jks + credentials.txt) for the user.
+      - name: Persist & package generated keystore
+        if: steps.signing.outputs.generated_keystore == 'true'
+        working-directory: ./Splash_WebView
+        env:
+          UPLOAD_WEBHOOK: ${{ github.event.client_payload.upload_webhook_url }}
+          SIGNING_FETCH_URL: ${{ github.event.client_payload.signing_fetch_url }}
+          PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
+          BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
+        run: |
+          KS_PATH="$PWD/app/release.jks"
+
+          # 1. Persist the .jks bytes for this package (reuse on future builds).
+          curl -s -f -X PUT "${UPLOAD_WEBHOOK}&type=package-key&pkgkey=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PACKAGE_NAME']))")" \
             -H "X-Build-Secret: $BUILD_SECRET" \
-            -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @"$APK_PATH")
+            -H "Content-Type: application/octet-stream" \
+            --data-binary @"$KS_PATH" || { echo "::error::keystore persist failed"; exit 1; }
 
-          echo "Worker responded $HTTP_CODE"
-          cat /tmp/upload_response.txt
+          # 2. Persist its credentials (paired with the .jks).
+          CREDS_URL="${SIGNING_FETCH_URL%%\?*}/creds"
+          curl -s -f -X POST "$CREDS_URL" \
+            -H "X-Build-Secret: $BUILD_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n --arg p "$PACKAGE_NAME" --arg s "$STORE_PW" --arg a "$KEY_ALIAS" --arg k "$KEY_PW" \
+                  '{package:$p, store_password:$s, key_alias:$a, key_password:$k}')" \
+            || { echo "::error::creds persist failed"; exit 1; }
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "::error::APK upload failed with HTTP $HTTP_CODE"
-            exit 1
-          fi
+          # 3. Build the user-downloadable bundle: keystore + a readme of creds.
+          cat > /tmp/credentials.txt <<EOF
+          Keep this file safe. You need this exact keystore to publish updates
+          to your app - a different keystore cannot update it on Google Play.
+
+          Package:        $PACKAGE_NAME
+          Keystore file:  release.jks
+          Store password: $STORE_PW
+          Key alias:      $KEY_ALIAS
+          Key password:   $KEY_PW
+          EOF
+          cp "$KS_PATH" /tmp/release.jks
+          (cd /tmp && zip -q keystore.zip release.jks credentials.txt)
+
+          curl -s -f -X PUT "${UPLOAD_WEBHOOK}&type=keystore" \
+            -H "X-Build-Secret: $BUILD_SECRET" \
+            -H "Content-Type: application/zip" \
+            --data-binary @/tmp/keystore.zip \
+            || { echo "::error::keystore zip upload failed"; exit 1; }
+
+      - name: Clean up signing material
+        if: always()
+        working-directory: ./Splash_WebView
+        run: |
+          rm -f app/keystore.properties app/release.jks /tmp/signing.json \
+                /tmp/release.jks /tmp/credentials.txt /tmp/keystore.zip || true
 
       # Runs only if any earlier step failed (customise, build, or upload).
       # Reports FAILED to the Worker so the app's Firestore listener stops

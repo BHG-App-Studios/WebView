@@ -323,3 +323,4 @@ jobs:
             -H "X-Build-Secret: $BUILD_SECRET" \
             -H "Content-Type: application/json" \
             -d '{"status":"FAILED"}' || true
+# force re-register 1790004481

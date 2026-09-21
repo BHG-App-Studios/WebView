@@ -152,14 +152,7 @@ class HomeFragment : Fragment() {
         // Keep every page inflated so all step bindings are ready when Build fires.
         binding.wizardPager.offscreenPageLimit  = 3
 
-        // Depth zoom page transformer for a premium slide+scale effect
-        binding.wizardPager.setPageTransformer { page, position ->
-            val abs = Math.abs(position)
-            page.alpha       = 1f - abs * 0.4f
-            page.translationX = -position * page.width * 0.1f
-            val scale = 1f - abs * 0.08f
-            page.scaleX = scale; page.scaleY = scale
-        }
+
 
         binding.wizardPager.registerOnPageChangeCallback(object : ViewPager2.OnPageChangeCallback() {
             override fun onPageSelected(position: Int) {

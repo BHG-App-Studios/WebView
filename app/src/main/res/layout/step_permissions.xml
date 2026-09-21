@@ -1,0 +1,112 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Step 3: Permission toggles + Build trigger button -->
+<androidx.core.widget.NestedScrollView
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:clipToPadding="false"
+    android:scrollbars="none"
+    android:paddingBottom="24dp">
+
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="vertical"
+        android:paddingStart="24dp"
+        android:paddingEnd="24dp"
+        android:paddingTop="20dp"
+        android:paddingBottom="16dp">
+
+        <!-- Step label -->
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="Step 3 of 3"
+            android:textSize="12sp"
+            android:letterSpacing="0.08"
+            android:fontFamily="@font/roboto_semibold"
+            android:textColor="@color/brand_primary"
+            android:textAllCaps="true"
+            android:layout_marginBottom="4dp" />
+
+        <!-- Title -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Permissions"
+            android:textAppearance="?attr/textAppearanceHeadlineSmall"
+            android:textColor="?attr/colorOnSurface"
+            android:fontFamily="@font/roboto_bold" />
+
+        <!-- Subtitle -->
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:text="Only enable what your website actually uses. Internet access is always included."
+            android:textAppearance="?attr/textAppearanceBodyMedium"
+            android:textColor="?attr/colorOnSurfaceVariant"
+            android:layout_marginTop="6dp"
+            android:layout_marginBottom="22dp"
+            android:lineSpacingMultiplier="1.4" />
+
+        <!-- Permission container (populated at runtime) -->
+        <LinearLayout
+            android:id="@+id/permissionContainer"
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical" />
+
+        <!-- Privacy note -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="20dp"
+            android:layout_marginBottom="8dp"
+            app:cardCornerRadius="14dp"
+            app:cardElevation="0dp"
+            app:cardBackgroundColor="#0D1E8E3E"
+            app:strokeWidth="0dp">
+
+            <LinearLayout
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:orientation="horizontal"
+                android:padding="14dp"
+                android:gravity="center_vertical">
+
+                <ImageView
+                    android:layout_width="20dp"
+                    android:layout_height="20dp"
+                    android:src="@drawable/ic_check"
+                    android:layout_marginEnd="10dp"
+                    app:tint="@color/success" />
+
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="Permissions are only requested from users when your website actually needs them."
+                    android:textSize="13sp"
+                    android:textColor="@color/success"
+                    android:fontFamily="@font/roboto_regular"
+                    android:lineSpacingMultiplier="1.3" />
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- Build button — full width, prominent -->
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/buildButton"
+            style="@style/Widget.App.Button"
+            android:layout_width="match_parent"
+            android:layout_height="58dp"
+            android:layout_marginTop="16dp"
+            android:text="Build My App"
+            android:textSize="16sp"
+            android:fontFamily="@font/roboto_semibold"
+            app:icon="@drawable/ic_build"
+            app:iconGravity="textStart"
+            app:iconPadding="10dp" />
+
+    </LinearLayout>
+</androidx.core.widget.NestedScrollView>

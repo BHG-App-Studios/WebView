@@ -60,6 +60,8 @@ const JAVA_RESERVED = new Set([
   'strictfp', 'super', 'switch', 'synchronized', 'this', 'throw', 'throws',
   'transient', 'try', 'void', 'volatile', 'while',
   'true', 'false', 'null', '_',
+  // Kotlin hard keywords (cannot appear as identifiers in Kotlin source)
+  'as', 'fun', 'in', 'is', 'object', 'typealias', 'val', 'var', 'when',
 ]);
 
 /* ------------------------------------------------------------------ *

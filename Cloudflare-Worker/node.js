@@ -370,12 +370,19 @@ function packageNameFromHost(hostname) {
     .split(".")
     .filter((label) => label && label !== "www")
     .map((label) => label.replace(/[^a-z0-9_]/g, "_"))
-    .map((label) => (/^[0-9]/.test(label) ? `_${label}` : label));
+    .map((label) => (/^[0-9]/.test(label) ? `_${label}` : label))
+    .map((label) => (RESERVED_WORDS.has(label) ? `${label}_` : label));
 
   if (labels.length < 2) return "com.bhg.webview";
 
   const pkg = [...labels.reverse(), "webview"].join(".");
-  return pkg.length <= 100 ? pkg : "com.bhg.webview";
+  if (pkg.length > 100) return "com.bhg.webview";
+
+  // Final safety: reject anything the per-label pass could not catch
+  if (!/^[a-z_][a-z0-9_]*(\.[a-z_][a-z0-9_]*)+$/.test(pkg)) return "com.bhg.webview";
+  if (pkg.split(".").some((s) => RESERVED_WORDS.has(s))) return "com.bhg.webview";
+
+  return pkg;
 }
 
 /** Cleans a display name. XML/Android escaping happens in the workflow. */

@@ -206,6 +206,18 @@ class HomeFragment : Fragment() {
                     stepEntryBinding = b
                     b.startBuildingButton.setOnClickListener { onStartBuilding() }
                     b.entryUrlInput.setOnEditorActionListener { _, _, _ -> onStartBuilding(); true }
+                    
+                    b.pasteButton.setOnClickListener {
+                        val clipboard = requireContext().getSystemService(android.content.Context.CLIPBOARD_SERVICE) as android.content.ClipboardManager
+                        if (clipboard.hasPrimaryClip()) {
+                            val text = clipboard.primaryClip?.getItemAt(0)?.text
+                            if (!text.isNullOrEmpty()) {
+                                b.entryUrlInput.setText(text)
+                                b.entryUrlInput.setSelection(text.length)
+                            }
+                        }
+                    }
+
                     setupButtonAnimations()
                     StepVH(b.root)
                 }

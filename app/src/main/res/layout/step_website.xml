@@ -1,5 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
-<!-- Step 1: Website URL, App Name, Package Name -->
+<!-- Step 1: App name + package name. The URL is collected on the entry screen. -->
 <androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
@@ -19,36 +19,6 @@
         android:paddingTop="20dp"
         android:paddingBottom="16dp">
 
-        <!-- Hero illustration area -->
-        <FrameLayout
-            android:layout_width="120dp"
-            android:layout_height="120dp"
-            android:layout_gravity="center_horizontal"
-            android:layout_marginBottom="4dp">
-
-            <!-- Outer glow ring -->
-            <View
-                android:layout_width="120dp"
-                android:layout_height="120dp"
-                android:background="@drawable/bg_hero_icon"
-                android:layout_gravity="center" />
-
-            <!-- Inner tighter ring -->
-            <View
-                android:layout_width="88dp"
-                android:layout_height="88dp"
-                android:layout_gravity="center"
-                android:background="@drawable/bg_circle_primary" />
-
-            <!-- Globe icon -->
-            <ImageView
-                android:layout_width="48dp"
-                android:layout_height="48dp"
-                android:layout_gravity="center"
-                android:src="@drawable/ic_globe"
-                app:tint="@color/brand_primary" />
-        </FrameLayout>
-
         <!-- Step label -->
         <TextView
             android:layout_width="wrap_content"
@@ -60,6 +30,7 @@
             android:fontFamily="@font/roboto_semibold"
             android:textColor="@color/brand_primary"
             android:textAllCaps="true"
+            android:layout_marginTop="8dp"
             android:layout_marginBottom="4dp" />
 
         <!-- Title -->
@@ -67,7 +38,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:text="Your Website"
+            android:text="App Details"
             android:textAppearance="?attr/textAppearanceHeadlineSmall"
             android:textColor="?attr/colorOnSurface"
             android:gravity="center"
@@ -78,7 +49,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:layout_gravity="center_horizontal"
-            android:text="Enter your website URL and give your app a name."
+            android:text="Give your app a name. The package name is optional."
             android:textAppearance="?attr/textAppearanceBodyMedium"
             android:textColor="?attr/colorOnSurfaceVariant"
             android:gravity="center"
@@ -87,33 +58,12 @@
             android:paddingStart="8dp"
             android:paddingEnd="8dp" />
 
-        <!-- URL field -->
-        <com.google.android.material.textfield.TextInputLayout
-            android:id="@+id/urlLayout"
-            style="@style/Widget.App.TextField"
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:hint="Website URL"
-            app:startIconDrawable="@drawable/ic_globe"
-            app:startIconTint="?attr/colorPrimary">
-
-            <com.google.android.material.textfield.TextInputEditText
-                android:id="@+id/urlInput"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:fontFamily="@font/roboto"
-                android:inputType="textUri"
-                android:maxLines="1"
-                android:imeOptions="actionNext" />
-        </com.google.android.material.textfield.TextInputLayout>
-
         <!-- App name field -->
         <com.google.android.material.textfield.TextInputLayout
             android:id="@+id/appNameLayout"
             style="@style/Widget.App.TextField"
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
-            android:layout_marginTop="14dp"
             android:hint="App Name">
 
             <com.google.android.material.textfield.TextInputEditText
@@ -148,42 +98,6 @@
                 android:maxLength="100"
                 android:imeOptions="actionDone" />
         </com.google.android.material.textfield.TextInputLayout>
-
-        <!-- Tip card -->
-        <com.google.android.material.card.MaterialCardView
-            android:layout_width="match_parent"
-            android:layout_height="wrap_content"
-            android:layout_marginTop="20dp"
-            app:cardCornerRadius="14dp"
-            app:cardElevation="0dp"
-            app:cardBackgroundColor="#0D0077D4"
-            app:strokeWidth="0dp">
-
-            <LinearLayout
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:orientation="horizontal"
-                android:padding="14dp"
-                android:gravity="center_vertical">
-
-                <ImageView
-                    android:layout_width="20dp"
-                    android:layout_height="20dp"
-                    android:src="@drawable/ic_build"
-                    android:layout_marginEnd="10dp"
-                    app:tint="@color/brand_primary" />
-
-                <TextView
-                    android:layout_width="0dp"
-                    android:layout_weight="1"
-                    android:layout_height="wrap_content"
-                    android:text="Any public website works — e-commerce, blogs, SaaS tools, and more."
-                    android:textSize="13sp"
-                    android:textColor="@color/brand_primary"
-                    android:fontFamily="@font/roboto_regular"
-                    android:lineSpacingMultiplier="1.3" />
-            </LinearLayout>
-        </com.google.android.material.card.MaterialCardView>
 
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>

@@ -66,6 +66,7 @@
     <string name="download_started">Download started. Check your notifications.</string>
     <string name="error_url_required">Enter a website URL</string>
     <string name="error_url_invalid">Enter a valid http or https URL</string>
+    <string name="error_url_unreachable">Could not reach that site. Check the URL and try again.</string>
     <string name="error_no_network">No internet connection</string>
     <string name="error_generic">Something went wrong. Please try again.</string>
 

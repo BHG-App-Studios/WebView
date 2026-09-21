@@ -3,6 +3,7 @@ package com.BHG.webapp
 import android.content.Intent
 import android.os.Bundle
 import android.util.Log
+import android.view.View
 import android.view.ViewGroup
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
@@ -41,6 +42,7 @@ class MainActivity : AppCompatActivity() {
 
     private var currentTab = 0
     private var backPressedTime: Long = 0
+    private var navVisible = true
 
     private lateinit var navButtons: List<Pair<Int, MaterialButton>>
     private val navPillMargin by lazy { resources.getDimensionPixelSize(R.dimen.nav_pill_margin) }
@@ -159,6 +161,38 @@ class MainActivity : AppCompatActivity() {
         OptionsSheet().show(supportFragmentManager, OptionsSheet.TAG)
     }
 
+    /**
+     * Shows or hides the floating capsule nav with a slide + fade. Used by the
+     * builder wizard: the bar stays on the entry screen (and every other tab) but
+     * slides away while the user is inside the numbered build steps, so the wizard
+     * gets the full height.
+     */
+    fun setBottomNavVisible(visible: Boolean, animate: Boolean = true) {
+        val capsule = binding.bottomNav.navCapsule
+        if (visible == navVisible && animate) return
+        navVisible = visible
+
+        // Distance to travel: the capsule's height plus its bottom margin, so it
+        // clears the screen edge entirely when hidden.
+        val lp = capsule.layoutParams as ViewGroup.MarginLayoutParams
+        val travel = (capsule.height + lp.bottomMargin).toFloat().coerceAtLeast(1f)
+
+        if (!animate) {
+            capsule.translationY = if (visible) 0f else travel
+            capsule.alpha = if (visible) 1f else 0f
+            capsule.visibility = if (visible) View.VISIBLE else View.GONE
+            return
+        }
+
+        if (visible) capsule.visibility = View.VISIBLE
+        capsule.animate()
+            .translationY(if (visible) 0f else travel)
+            .alpha(if (visible) 1f else 0f)
+            .setDuration(220L)
+            .withEndAction { if (!visible) capsule.visibility = View.GONE }
+            .start()
+    }
+
     private fun selectTab(itemId: Int) {
         val fragment: Fragment = when (itemId) {
             R.id.nav_home    -> BuildFragment()
@@ -167,6 +201,9 @@ class MainActivity : AppCompatActivity() {
             else             -> HomeFragment()   // nav_landing = wizard
         }
         currentTab = itemId
+        // Any tab switch lands on a screen that shows the nav (the wizard only hides
+        // it once you advance past its entry screen), so restore it here.
+        setBottomNavVisible(true, animate = false)
         supportFragmentManager.beginTransaction()
             .setReorderingAllowed(true)
             .replace(R.id.fragmentContainer, fragment)

@@ -17,6 +17,7 @@ import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
 import com.BHG.webapp.databinding.FragmentHomeBinding
+import com.BHG.webapp.databinding.StepEntryBinding
 import com.BHG.webapp.databinding.StepFeaturesBinding
 import com.BHG.webapp.databinding.StepPermissionsBinding
 import com.BHG.webapp.databinding.StepWebsiteBinding
@@ -44,9 +45,14 @@ class HomeFragment : Fragment() {
     private val binding get() = _binding!!
 
     // ── Step bindings ─────────────────────────────────────────────────────────
+    private var stepEntryBinding: StepEntryBinding? = null
     private var stepWebsiteBinding: StepWebsiteBinding? = null
     private var stepFeaturesBinding: StepFeaturesBinding? = null
     private var stepPermissionsBinding: StepPermissionsBinding? = null
+
+    /** URL confirmed reachable on the entry screen; reused by the build request. */
+    private var confirmedUrl: String = ""
+    private var pinging = false
 
     // ── Firebase ──────────────────────────────────────────────────────────────
     private val auth: FirebaseAuth? by lazy { runCatching { FirebaseAuth.getInstance() }.getOrNull() }
@@ -85,11 +91,14 @@ class HomeFragment : Fragment() {
         PermissionOption("notifications", R.string.perm_notifications, listOf("POST_NOTIFICATIONS"),                true)
     )
 
-    // ── Step constants ────────────────────────────────────────────────────────
-    private val STEP_WEBSITE     = 0
-    private val STEP_FEATURES    = 1
-    private val STEP_PERMISSIONS = 2
-    private val TOTAL_STEPS      = 3
+    // ── Page constants ──────────────────────────────────────────────────────
+    // Page 0 is the uncounted entry screen (URL + Start Building). The three
+    // numbered steps follow it.
+    private val PAGE_ENTRY       = 0
+    private val STEP_WEBSITE     = 1  // Step 1: app name + package
+    private val STEP_FEATURES    = 2  // Step 2: features
+    private val STEP_PERMISSIONS = 3  // Step 3: permissions + build
+    private val TOTAL_STEPS      = 4
 
     // =========================================================================
     //  Lifecycle
@@ -116,11 +125,11 @@ class HomeFragment : Fragment() {
             object : OnBackPressedCallback(true) {
                 override fun handleOnBackPressed() {
                     val current = binding.wizardPager.currentItem
-                    if (current > STEP_WEBSITE) {
-                        // Navigate to previous step
+                    if (current > PAGE_ENTRY) {
+                        // Step back toward the entry screen (nav bar reappears there).
                         goBack()
                     } else {
-                        // On step 1: let MainActivity handle (double-back-to-exit)
+                        // On the entry screen: let MainActivity handle it.
                         isEnabled = false
                         requireActivity().onBackPressedDispatcher.onBackPressed()
                         isEnabled = true
@@ -138,7 +147,8 @@ class HomeFragment : Fragment() {
         val adapter = WizardPagerAdapter()
         binding.wizardPager.adapter = adapter
         binding.wizardPager.isUserInputEnabled = false
-        binding.wizardPager.offscreenPageLimit  = 2
+        // Keep every page inflated so all step bindings are ready when Build fires.
+        binding.wizardPager.offscreenPageLimit  = 3
 
         // Depth zoom page transformer for a premium slide+scale effect
         binding.wizardPager.setPageTransformer { page, position ->
@@ -153,6 +163,7 @@ class HomeFragment : Fragment() {
             override fun onPageSelected(position: Int) {
                 updateTopBarForStep(position)
                 updateNextButtonForStep(position)
+                updateNavForStep(position)
             }
         })
     }
@@ -188,6 +199,13 @@ class HomeFragment : Fragment() {
         override fun onCreateViewHolder(parent: ViewGroup, viewType: Int): StepVH {
             val inf = LayoutInflater.from(parent.context)
             return when (viewType) {
+                PAGE_ENTRY -> {
+                    val b = StepEntryBinding.inflate(inf, parent, false)
+                    stepEntryBinding = b
+                    b.startBuildingButton.setOnClickListener { onStartBuilding() }
+                    b.entryUrlInput.setOnEditorActionListener { _, _, _ -> onStartBuilding(); true }
+                    StepVH(b.root)
+                }
                 STEP_WEBSITE -> {
                     val b = StepWebsiteBinding.inflate(inf, parent, false)
                     stepWebsiteBinding = b
@@ -251,11 +269,8 @@ class HomeFragment : Fragment() {
         if (cur > STEP_WEBSITE) binding.wizardPager.setCurrentItem(cur - 1, true)
     }
 
+    /** Step 1 → Step 2. App name/package are optional, so no validation is needed. */
     private fun onNextFromWebsite() {
-        val url = stepWebsiteBinding?.urlInput?.text?.toString()?.trim().orEmpty()
-        stepWebsiteBinding?.urlLayout?.error = null
-        if (url.isEmpty()) { stepWebsiteBinding?.urlLayout?.error = getString(R.string.error_url_required); return }
-        if (!isValidHttpUrl(url)) { stepWebsiteBinding?.urlLayout?.error = getString(R.string.error_url_invalid); return }
         goToStep(STEP_FEATURES)
     }
 
@@ -264,23 +279,72 @@ class HomeFragment : Fragment() {
     // =========================================================================
 
 
+    /** Nav bar shows on the entry screen and hides on the numbered steps. */
+    private fun updateNavForStep(position: Int) {
+        (activity as? MainActivity)?.setBottomNavVisible(position == PAGE_ENTRY)
+    }
+
     private fun updateTopBarForStep(step: Int) {
-        // GONE (not INVISIBLE) on step 1 so the hidden back button reserves no space —
-        // the hamburger then sits at the same start position as the other fragments'
-        // top bars, and the title lines up identically.
-        binding.topBarBack.visibility = if (step > STEP_WEBSITE) View.VISIBLE else View.GONE
-        binding.topBarMenu.visibility = if (step == STEP_WEBSITE) View.VISIBLE else View.GONE
-        binding.topBarTitle.text = listOf("Build App", "App Features", "Permissions").getOrNull(step) ?: "Build App"
+        // Hamburger is the leading control on the entry screen; the numbered steps
+        // show a back arrow instead. GONE (not INVISIBLE) so the hidden control
+        // reserves no space and the title lines up with the other fragments.
+        binding.topBarMenu.visibility = if (step == PAGE_ENTRY) View.VISIBLE else View.GONE
+        binding.topBarBack.visibility = if (step == PAGE_ENTRY) View.GONE else View.VISIBLE
+        binding.topBarTitle.text = when (step) {
+            PAGE_ENTRY       -> "Build App"
+            STEP_WEBSITE     -> "App Details"
+            STEP_FEATURES    -> "App Features"
+            STEP_PERMISSIONS -> "Permissions"
+            else             -> "Build App"
+        }
     }
 
     private fun updateNextButtonForStep(step: Int) {
         when (step) {
+            // Entry has its own full-width "Start Building" button; the floating Next
+            // drives the two middle steps. Permissions has the Build button.
             STEP_WEBSITE, STEP_FEATURES -> {
                 binding.btnNext.visibility = View.VISIBLE
                 binding.btnNext.text = "Next"
                 binding.btnNext.setIconResource(R.drawable.ic_arrow_forward)
             }
             else -> binding.btnNext.visibility = View.GONE
+        }
+    }
+
+    /**
+     * Entry screen action: validate the URL locally, then ping it. Only a reachable
+     * URL advances to Step 1; anything else surfaces an inline error. The button and
+     * an indeterminate progress bar reflect the in-flight check.
+     */
+    private fun onStartBuilding() {
+        if (pinging) return
+        val entry = stepEntryBinding ?: return
+        val url = entry.entryUrlInput.text?.toString()?.trim().orEmpty()
+
+        entry.entryUrlLayout.error = null
+        if (url.isEmpty()) { entry.entryUrlLayout.error = getString(R.string.error_url_required); return }
+        if (!isValidHttpUrl(url)) { entry.entryUrlLayout.error = getString(R.string.error_url_invalid); return }
+        if (isOffline()) { toast(R.string.error_no_network); return }
+
+        pinging = true
+        entry.startBuildingButton.isEnabled = false
+        entry.startBuildingButton.text = "Checking…"
+        entry.entryProgress.visibility = View.VISIBLE
+
+        BuildApi.ping(url) { reachable ->
+            if (!isAdded || _binding == null) return@ping
+            pinging = false
+            entry.startBuildingButton.isEnabled = true
+            entry.startBuildingButton.text = "Start Building"
+            entry.entryProgress.visibility = View.GONE
+
+            if (reachable) {
+                confirmedUrl = url
+                goToStep(STEP_WEBSITE)
+            } else {
+                entry.entryUrlLayout.error = getString(R.string.error_url_unreachable)
+            }
         }
     }
 
@@ -292,13 +356,14 @@ class HomeFragment : Fragment() {
         if (buildDispatching) return
         if (isOffline()) { toast(R.string.error_no_network); return }
 
-        val url         = stepWebsiteBinding?.urlInput?.text?.toString()?.trim().orEmpty()
+        val url         = confirmedUrl
         val appName     = stepWebsiteBinding?.appNameInput?.text?.toString()?.trim().orEmpty()
         val packageName = stepWebsiteBinding?.packageInput?.text?.toString()?.trim().orEmpty()
 
         if (url.isEmpty() || !isValidHttpUrl(url)) {
-            goToStep(STEP_WEBSITE)
-            stepWebsiteBinding?.urlLayout?.error = getString(R.string.error_url_invalid)
+            // URL was confirmed on the entry screen; if it's somehow missing, send
+            // the user back there to re-enter it.
+            goToStep(PAGE_ENTRY)
             return
         }
 
@@ -383,14 +448,16 @@ class HomeFragment : Fragment() {
     //  Helpers
     // =========================================================================
 
-    /** Reset wizard to step 1 so user can start a new build. */
+    /** Reset wizard to the entry screen so the user can start a new build. */
     private fun resetWizard() {
         buildDispatching = false
+        confirmedUrl = ""
         stepPermissionsBinding?.buildButton?.isEnabled = true
-        binding.wizardPager.setCurrentItem(STEP_WEBSITE, false)
-        stepWebsiteBinding?.urlInput?.text?.clear()
+        binding.wizardPager.setCurrentItem(PAGE_ENTRY, false)
+        stepEntryBinding?.entryUrlInput?.text?.clear()
         stepWebsiteBinding?.appNameInput?.text?.clear()
         stepWebsiteBinding?.packageInput?.text?.clear()
+        (activity as? MainActivity)?.setBottomNavVisible(true, animate = false)
     }
 
     private fun resetBuildButton() {
@@ -420,6 +487,7 @@ class HomeFragment : Fragment() {
     private fun dpToPx(dp: Int) = (dp * resources.displayMetrics.density).toInt()
 
     override fun onDestroyView() {
+        stepEntryBinding       = null
         stepWebsiteBinding     = null
         stepFeaturesBinding    = null
         stepPermissionsBinding = null

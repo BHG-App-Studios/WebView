@@ -83,6 +83,40 @@ object BuildApi {
         mainHandler.post { onError(message) }
     }
 
+    /**
+     * Checks whether [urlString] is reachable, on a background thread, calling back
+     * on the main thread. Tries a lightweight HEAD first and falls back to GET (some
+     * servers reject HEAD). Any 2xx/3xx — or even a 4xx that isn't 404 — counts as
+     * "the site answered", since the goal is only to confirm the host responds.
+     * Follows redirects. onResult(true) means reachable.
+     */
+    fun ping(urlString: String, onResult: (Boolean) -> Unit) {
+        executor.execute {
+            val reachable = probe(urlString, "HEAD") || probe(urlString, "GET")
+            mainHandler.post { onResult(reachable) }
+        }
+    }
+
+    private fun probe(urlString: String, method: String): Boolean {
+        var conn: HttpURLConnection? = null
+        return try {
+            conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+                requestMethod = method
+                connectTimeout = CONNECT_TIMEOUT_MS
+                readTimeout = READ_TIMEOUT_MS
+                instanceFollowRedirects = true
+                setRequestProperty("User-Agent", "Mozilla/5.0 (Android) WebCraft")
+            }
+            val code = conn.responseCode
+            // Host answered with anything other than "not found" → treat as reachable.
+            code in 200..399 || (code in 400..499 && code != 404)
+        } catch (e: Exception) {
+            false
+        } finally {
+            conn?.disconnect()
+        }
+    }
+
     private fun post(urlString: String, body: String, idToken: String): Pair<Int, String> {
         val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
             requestMethod = "POST"

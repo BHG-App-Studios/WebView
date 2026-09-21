@@ -99,7 +99,9 @@ export default {
           PACKAGE_NAME: packageName,
           CONSTANTS: constants,
           REMOVE_PERMISSIONS: removal.permissions,
-          UPLOAD_WEBHOOK_URL: uploadWebhookUrl,
+          // Carry the resolved package name to the upload handler so it can
+          // overwrite the caller's placeholder ("auto") once the build lands.
+          UPLOAD_WEBHOOK_URL: `${uploadWebhookUrl}&pkg=${encodeURIComponent(packageName)}`,
           STATUS_WEBHOOK_URL: statusWebhookUrl
         };
 
@@ -170,11 +172,18 @@ export default {
         const uid = url.searchParams.get("uid");
         if (uid) {
           try {
-            await updateBuildDoc(env, uid, buildId, {
+            const readyFields = {
               status: "READY",
               sizeBytes: putResult && putResult.size ? putResult.size : 0,
               downloadUrl: `${url.origin}/download/${buildId}.apk`
-            });
+            };
+            // Replace the caller's placeholder package name ("auto") with the
+            // real one resolved at dispatch and passed through the webhook URL.
+            const pkg = url.searchParams.get("pkg");
+            if (pkg) {
+              readyFields.packageName = pkg;
+            }
+            await updateBuildDoc(env, uid, buildId, readyFields);
           } catch (e) {
             console.log(`Firestore READY update failed for ${buildId}: ${e.message}`);
           }

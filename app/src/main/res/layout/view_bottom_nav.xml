@@ -10,7 +10,7 @@
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:id="@+id/navCapsule"
-    android:layout_width="wrap_content"
+    android:layout_width="match_parent"
     android:layout_height="wrap_content"
     android:orientation="horizontal"
     android:gravity="center_vertical"
@@ -25,6 +25,8 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/navLanding"
         style="@style/Widget.App.NavItem"
+        android:layout_width="0dp"
+        android:layout_weight="1"
         android:layout_marginStart="2dp"
         android:layout_marginEnd="2dp"
         android:contentDescription="@string/nav_landing"
@@ -33,6 +35,8 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/navBuild"
         style="@style/Widget.App.NavItem"
+        android:layout_width="0dp"
+        android:layout_weight="1"
         android:layout_marginStart="2dp"
         android:layout_marginEnd="2dp"
         android:contentDescription="@string/nav_home"
@@ -41,6 +45,8 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/navApps"
         style="@style/Widget.App.NavItem"
+        android:layout_width="0dp"
+        android:layout_weight="1"
         android:layout_marginStart="2dp"
         android:layout_marginEnd="2dp"
         android:contentDescription="@string/nav_history"
@@ -49,6 +55,8 @@
     <com.google.android.material.button.MaterialButton
         android:id="@+id/navAccount"
         style="@style/Widget.App.NavItem"
+        android:layout_width="0dp"
+        android:layout_weight="1"
         android:layout_marginStart="2dp"
         android:layout_marginEnd="2dp"
         android:contentDescription="@string/nav_profile"

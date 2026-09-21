@@ -59,10 +59,11 @@ export default {
           );
         }
 
-        const downloadUrl = `${url.origin}/download/${buildId}.apk`;
         // uid rides along so the upload/report handlers can update the correct
-        // Firestore doc (users/{uid}/builds/{buildId}) when the build finishes.
+        // Firestore doc (users/{uid}/builds/{buildId}) and address the caller's
+        // own R2 folder ({uid}/...) when the build finishes.
         const uidParam = encodeURIComponent(uid);
+        const downloadUrl = `${url.origin}/download/${uidParam}/${buildId}.apk`;
         const uploadWebhookUrl = `${url.origin}/api/upload/${buildId}?uid=${uidParam}`;
         const statusWebhookUrl = `${url.origin}/api/report/${buildId}?uid=${uidParam}`;
 
@@ -102,7 +103,7 @@ export default {
         // Build type + output format + signing mode. Validated here; the
         // secrets (keystore bytes / passwords) never travel in the GitHub
         // dispatch payload - they are stashed in R2 and fetched by the runner.
-        const signing = await resolveSigning(body, buildId, packageName, env);
+        const signing = await resolveSigning(body, buildId, packageName, uid, env);
         if (signing.error) {
           return jsonResponse({ error: signing.error }, 400, corsHeaders);
         }
@@ -173,7 +174,7 @@ export default {
           outputs: signing.outputs,
           signing_mode: signing.signingMode,
           download_url: downloadUrl,
-          status_url: `${url.origin}/api/status/${buildId}`,
+          status_url: `${url.origin}/api/status/${buildId}?uid=${uidParam}`,
           message: ghMessage,
           options: resolved.options,
           config: buildConfig
@@ -196,30 +197,38 @@ export default {
         let buildId = path.replace("/api/upload/", "").trim();
         buildId = buildId.replace(/\.(apk|aab|zip)$/i, "");
 
+        // Every artifact lives under the caller's own folder: {uid}/... . The
+        // uid rides in the webhook URL the Worker built at dispatch time, so it
+        // is required here - without it we cannot address the right folder.
+        const uid = url.searchParams.get("uid");
+        if (!uid) return jsonResponse({ error: "uid required" }, 400, corsHeaders);
+
         // What kind of artifact is being uploaded. Defaults to "apk" so the
         // existing debug path keeps working unchanged.
-        //   apk           -> apks/{buildId}.apk           (public download)
-        //   aab           -> aabs/{buildId}.aab           (public download)
-        //   keystore      -> downloads/{buildId}.keystore.zip (owner-only)
-        //   package-key   -> keystores/{package}.jks       (reuse store)
+        //   apk           -> {uid}/apks/{buildId}.apk            (public download)
+        //   aab           -> {uid}/aabs/{buildId}.aab            (public download)
+        //   keystore      -> {uid}/downloads/{buildId}.keystore.zip (owner-only)
+        //   package-key   -> {uid}/keystores/{package}.jks       (per-user reuse store)
         const type = (url.searchParams.get("type") || "apk").toLowerCase();
 
         // package-key: the runner persisting a freshly generated per-package
-        // keystore for reuse on future builds. `pkgkey` carries the package.
+        // keystore for reuse on future builds by THIS user. `pkgkey` carries
+        // the package; the key is scoped to {uid} so two users building the
+        // same package never share a signing key.
         if (type === "package-key") {
           const pkgKey = url.searchParams.get("pkgkey");
           if (!pkgKey) return jsonResponse({ error: "pkgkey required" }, 400, corsHeaders);
-          await env.BUCKET.put(`keystores/${pkgKey}.jks`, request.body, {
+          await env.BUCKET.put(`${uid}/keystores/${pkgKey}.jks`, request.body, {
             httpMetadata: { contentType: "application/octet-stream" },
             customMetadata: { uploadedAt: new Date().toISOString() }
           });
-          return jsonResponse({ success: true, stored: `keystores/${pkgKey}.jks` }, 200, corsHeaders);
+          return jsonResponse({ success: true, stored: `${uid}/keystores/${pkgKey}.jks` }, 200, corsHeaders);
         }
 
         const spec = {
-          apk:      { key: `apks/${buildId}.apk`,               ct: "application/vnd.android.package-archive", ext: "apk" },
-          aab:      { key: `aabs/${buildId}.aab`,               ct: "application/octet-stream",                ext: "aab" },
-          keystore: { key: `downloads/${buildId}.keystore.zip`, ct: "application/zip",                         ext: "keystore.zip" }
+          apk:      { key: `${uid}/apks/${buildId}.apk`,               ct: "application/vnd.android.package-archive", ext: "apk" },
+          aab:      { key: `${uid}/aabs/${buildId}.aab`,               ct: "application/octet-stream",                ext: "aab" },
+          keystore: { key: `${uid}/downloads/${buildId}.keystore.zip`, ct: "application/zip",                         ext: "keystore.zip" }
         }[type];
         if (!spec) return jsonResponse({ error: `Unknown upload type '${type}'` }, 400, corsHeaders);
 
@@ -234,15 +243,15 @@ export default {
         // Update the Firestore doc so the app's live listener reacts. Each
         // artifact type updates its own field(s). Best-effort: a failure here
         // must not fail the upload (the object is already stored).
-        const uid = url.searchParams.get("uid");
-        if (uid) {
+        {
+          const uidParam = encodeURIComponent(uid);
           try {
             const fields = {};
             if (type === "apk") {
               // The APK is the primary artifact: it flips the build to READY.
               fields.status = "READY";
               fields.sizeBytes = putResult && putResult.size ? putResult.size : 0;
-              fields.downloadUrl = `${url.origin}/download/${buildId}.apk`;
+              fields.downloadUrl = `${url.origin}/download/${uidParam}/${buildId}.apk`;
               // Replace the caller's placeholder package name ("auto") with the
               // real one resolved at dispatch and passed through the webhook URL.
               const pkg = url.searchParams.get("pkg");
@@ -250,7 +259,7 @@ export default {
             } else if (type === "aab") {
               // For AAB-only release builds, the AAB flips the build to READY.
               fields.status = "READY";
-              fields.aabDownloadUrl = `${url.origin}/download/${buildId}.aab`;
+              fields.aabDownloadUrl = `${url.origin}/download/${uidParam}/${buildId}.aab`;
             } else if (type === "keystore") {
               fields.keystoreAvailable = true;
               fields.keystoreDownloadUrl = `${url.origin}/api/keystore/${buildId}`;
@@ -284,15 +293,22 @@ export default {
         }
         const buildId = path.replace("/api/signing/", "").trim();
 
-        const obj = await env.BUCKET.get(`signing/${buildId}/bundle.json`);
+        // uid scopes both the signing bundle and any reusable keystore to the
+        // caller's own folder. It rides in the signing_fetch_url query string.
+        const uid = url.searchParams.get("uid");
+        if (!uid) return jsonResponse({ error: "uid required" }, 400, corsHeaders);
+
+        const obj = await env.BUCKET.get(`${uid}/signing/${buildId}/bundle.json`);
         if (!obj) return jsonResponse({ error: "No signing material for this build" }, 404, corsHeaders);
         const bundle = JSON.parse(await obj.text());
 
-        // Auto mode: attach an existing per-package keystore if we have one, so
-        // the runner reuses it instead of generating a new (incompatible) key.
+        // Auto mode: attach this user's existing per-package keystore if we have
+        // one, so the runner reuses it instead of generating a new (incompatible)
+        // key. Scoped to {uid}: another user's key for the same package is never
+        // returned here.
         if (bundle.mode === "auto" && bundle.packageName) {
-          const existing = await env.BUCKET.get(`keystores/${bundle.packageName}.jks`);
-          const creds = await env.BUCKET.get(`keystores/${bundle.packageName}.json`);
+          const existing = await env.BUCKET.get(`${uid}/keystores/${bundle.packageName}.jks`);
+          const creds = await env.BUCKET.get(`${uid}/keystores/${bundle.packageName}.json`);
           if (existing && creds) {
             const buf = await existing.arrayBuffer();
             bundle.existingKeystoreB64 = bytesToBase64(new Uint8Array(buf));
@@ -314,10 +330,12 @@ export default {
         if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
           return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
         }
+        const uid = url.searchParams.get("uid");
+        if (!uid) return jsonResponse({ error: "uid required" }, 400, corsHeaders);
         const body = await request.json().catch(() => ({}));
         const pkg = String(body.package || "").trim();
         if (!pkg) return jsonResponse({ error: "package required" }, 400, corsHeaders);
-        await env.BUCKET.put(`keystores/${pkg}.json`, JSON.stringify({
+        await env.BUCKET.put(`${uid}/keystores/${pkg}.json`, JSON.stringify({
           storePassword: body.store_password,
           keyAlias: body.key_alias,
           keyPassword: body.key_password
@@ -362,14 +380,21 @@ export default {
       // 3. PUBLIC DOWNLOAD: GET /download/:buildId.apk  (or .aab)
       // ----------------------------------------------------
       if (method === "GET" && path.startsWith("/download/")) {
-        let fileName = path.replace("/download/", "").trim();
-        // Default to .apk to keep old links working; .aab is served from its
-        // own R2 prefix.
+        // Path is /download/{uid}/{buildId}.(apk|aab): the artifact lives in the
+        // owner's folder. Split off the uid; the rest is the file name.
+        const rest = path.replace("/download/", "").trim();
+        const slash = rest.indexOf("/");
+        if (slash < 1) {
+          return new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
+        }
+        const dlUid = rest.slice(0, slash);
+        let fileName = rest.slice(slash + 1);
+        // Default to .apk; .aab is served from its own R2 prefix.
         const isAab = fileName.endsWith(".aab");
         if (!fileName.endsWith(".apk") && !isAab) {
           fileName += ".apk";
         }
-        const objectKey = isAab ? `aabs/${fileName}` : `apks/${fileName}`;
+        const objectKey = isAab ? `${dlUid}/aabs/${fileName}` : `${dlUid}/apks/${fileName}`;
 
         const file = await env.BUCKET.get(objectKey);
 
@@ -427,7 +452,7 @@ export default {
           return jsonResponse({ error: `Authorization check failed: ${e.message}` }, 502, corsHeaders);
         }
 
-        const file = await env.BUCKET.get(`downloads/${buildId}.keystore.zip`);
+        const file = await env.BUCKET.get(`${uid}/downloads/${buildId}.keystore.zip`);
         if (!file) return jsonResponse({ error: "No keystore for this build" }, 404, corsHeaders);
 
         const headers = new Headers();
@@ -448,7 +473,16 @@ export default {
           buildId = buildId.replace(".apk", "");
         }
 
-        const objectKey = `apks/${buildId}.apk`;
+        // Artifacts are stored per-user; the app passes ?uid= so we can look in
+        // the right folder. The live Firestore listener is the primary status
+        // channel - this endpoint is a best-effort fallback.
+        const uid = url.searchParams.get("uid");
+        if (!uid) {
+          return jsonResponse({ build_id: buildId, status: "BUILDING_OR_NOT_FOUND" }, 200, corsHeaders);
+        }
+        const uidParam = encodeURIComponent(uid);
+        const downloadUrl = `${url.origin}/download/${uidParam}/${buildId}.apk`;
+        const objectKey = `${uid}/apks/${buildId}.apk`;
         const head = await env.BUCKET.head(objectKey);
 
         if (head) {
@@ -457,13 +491,13 @@ export default {
             status: "READY",
             size_bytes: head.size,
             uploaded_at: head.uploaded,
-            download_url: `${url.origin}/download/${buildId}.apk`
+            download_url: downloadUrl
           }, 200, corsHeaders);
         } else {
           return jsonResponse({
             build_id: buildId,
             status: "BUILDING_OR_NOT_FOUND",
-            download_url: `${url.origin}/download/${buildId}.apk`
+            download_url: downloadUrl
           }, 200, corsHeaders);
         }
       }
@@ -762,16 +796,19 @@ function resolveOptions(body) {
 // Build type / output / signing resolution
 // --------------------------------------------------------
 //
-// R2 layout (all under the same bucket):
-//   apks/{buildId}.apk            - the built APK (public download, unchanged)
-//   aabs/{buildId}.aab            - the built AAB, when requested
-//   signing/{buildId}/bundle.json - short-lived signing material the runner
-//                                   fetches (custom keystore + passwords, OR a
-//                                   pointer telling the runner to auto-generate)
-//   keystores/{package}.jks       - the per-package auto keystore, retained so
-//                                   future builds of the same app reuse the key
-//   keystores/{package}.json      - its passwords/alias, retained alongside
-//   downloads/{buildId}.keystore.zip - the user-downloadable bundle (auto mode)
+// R2 layout - everything is namespaced under the owner's uid, so one folder
+// per user keeps each user's artifacts and signing keys fully separated:
+//   {uid}/apks/{buildId}.apk            - the built APK (served via /download/{uid}/..)
+//   {uid}/aabs/{buildId}.aab            - the built AAB, when requested
+//   {uid}/signing/{buildId}/bundle.json - short-lived signing material the runner
+//                                         fetches (custom keystore + passwords, OR
+//                                         a pointer telling it to auto-generate)
+//   {uid}/keystores/{package}.jks       - this user's per-package auto keystore,
+//                                         retained so their future builds of the
+//                                         same app reuse the key (never shared
+//                                         with another user, even same package)
+//   {uid}/keystores/{package}.json      - its passwords/alias, retained alongside
+//   {uid}/downloads/{buildId}.keystore.zip - the user-downloadable bundle (auto mode)
 //
 // A keystore password can never ride in the GitHub dispatch payload (it is
 // echoed to the Action log). So the payload carries only a fetch URL; the
@@ -786,7 +823,7 @@ const VALID_OUTPUTS = new Set(["apk", "aab"]);
  *
  * @returns {{buildType, outputs, signingMode}|{error}}
  */
-async function resolveSigning(body, buildId, packageName, env) {
+async function resolveSigning(body, buildId, packageName, uid, env) {
   // Build type ----------------------------------------------------------
   const buildType = String(body.build_type || "debug").trim().toLowerCase();
   if (buildType !== "debug" && buildType !== "release") {
@@ -836,7 +873,7 @@ async function resolveSigning(body, buildId, packageName, env) {
   }
 
   try {
-    await env.BUCKET.put(`signing/${buildId}/bundle.json`, JSON.stringify(bundle), {
+    await env.BUCKET.put(`${uid}/signing/${buildId}/bundle.json`, JSON.stringify(bundle), {
       httpMetadata: { contentType: "application/json" }
     });
   } catch (e) {

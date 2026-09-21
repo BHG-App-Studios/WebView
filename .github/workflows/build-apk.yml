@@ -270,8 +270,9 @@ jobs:
             -H "Content-Type: application/octet-stream" \
             --data-binary @"$KS_PATH" || { echo "::error::keystore persist failed"; exit 1; }
 
-          # 2. Persist its credentials (paired with the .jks).
-          CREDS_URL="${SIGNING_FETCH_URL%%\?*}/creds"
+          # 2. Persist its credentials (paired with the .jks). Keep the ?uid=
+          #    query from the signing URL so the Worker stores under {uid}/.
+          CREDS_URL="${SIGNING_FETCH_URL%%\?*}/creds?${SIGNING_FETCH_URL#*\?}"
           curl -s -f -X POST "$CREDS_URL" \
             -H "X-Build-Secret: $BUILD_SECRET" \
             -H "Content-Type: application/json" \

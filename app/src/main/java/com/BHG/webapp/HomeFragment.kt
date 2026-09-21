@@ -291,11 +291,11 @@ class HomeFragment : Fragment() {
         binding.topBarMenu.visibility = if (step == PAGE_ENTRY) View.VISIBLE else View.GONE
         binding.topBarBack.visibility = if (step == PAGE_ENTRY) View.GONE else View.VISIBLE
         binding.topBarTitle.text = when (step) {
-            PAGE_ENTRY       -> "Build App"
+            PAGE_ENTRY       -> "WebCraft"
             STEP_WEBSITE     -> "App Details"
             STEP_FEATURES    -> "App Features"
             STEP_PERMISSIONS -> "Permissions"
-            else             -> "Build App"
+            else             -> "WebCraft"
         }
     }
 

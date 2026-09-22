@@ -21,6 +21,10 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.WebsiteAppBuilder">
 
+        <meta-data
+            android:name="com.google.android.gms.ads.APPLICATION_ID"
+            android:value="ca-app-pub-7145614986771607~6230213418" />
+
         <activity
             android:name=".AuthActivity"
             android:exported="true"

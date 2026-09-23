@@ -1,6 +1,6 @@
 <resources>
     <!-- Launcher label -->
-    <string name="app_name">WebCraft Web to App</string>
+    <string name="app_name">WebCraft: Website to App Maker</string>
     <!-- Short name shown inside the app -->
     <string name="app_display_name">WebCraft</string>
 

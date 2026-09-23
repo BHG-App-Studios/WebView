@@ -20,5 +20,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "Website to App Builder"
+rootProject.name = "Website to App Maker"
 include(":app")

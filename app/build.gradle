@@ -9,7 +9,7 @@ android {
     compileSdk 37
     defaultConfig {
         applicationId "com.BHG.webapp"
-        minSdk 23
+        minSdk 24
         targetSdk 37
         versionCode 1
         versionName "1.0"
@@ -37,7 +37,6 @@ android {
 
 }
 dependencies {
-    // Required by coreLibraryDesugaringEnabled above
     coreLibraryDesugaring libs.desugar.jdk.libs
 
     // AndroidX Core + UI

@@ -70,9 +70,11 @@
             android:id="@+id/emptyState"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:layout_marginBottom="120dp"
             android:orientation="vertical"
             android:gravity="center"
-            android:padding="32dp"
+            android:paddingStart="32dp"
+            android:paddingEnd="32dp"
             android:visibility="gone">
 
             <FrameLayout

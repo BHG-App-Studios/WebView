@@ -12,7 +12,7 @@ export default {
     // CORS preflight headers
     const corsHeaders = {
       "Access-Control-Allow-Origin": "*",
-      "Access-Control-Allow-Methods": "GET, POST, PUT, OPTIONS",
+      "Access-Control-Allow-Methods": "GET, POST, PUT, DELETE, OPTIONS",
       "Access-Control-Allow-Headers": "Content-Type, Authorization, X-Build-Secret",
     };
 
@@ -520,6 +520,52 @@ export default {
         // Never cache a signing key at any shared layer.
         headers.set("Cache-Control", "no-store");
         return new Response(file.body, { headers });
+      }
+
+      // ----------------------------------------------------
+      // 3c. PERMANENT DELETE: DELETE /api/app/:buildId
+      //     Owner-only (Firebase ID token). Wipes every server-side artifact for
+      //     this build from R2 — APK, AAB, the owner keystore bundle and the
+      //     runner's signing bundle. The per-package auto keystore
+      //     ({uid}/keystores/{package}.jks) is intentionally left untouched: it
+      //     is shared across all builds of that package, so removing it would
+      //     break updates of other apps. The caller deletes the Firestore doc.
+      // ----------------------------------------------------
+      if (method === "DELETE" && path.startsWith("/api/app/")) {
+        const buildId = path.replace("/api/app/", "").trim();
+        if (!buildId) return jsonResponse({ error: "Missing build id" }, 400, corsHeaders);
+
+        if (!env.FIREBASE_PROJECT_ID) {
+          return jsonResponse({ error: "Server auth not configured" }, 503, corsHeaders);
+        }
+        const authHeader = request.headers.get("Authorization") || "";
+        const m = authHeader.match(/^Bearer\s+(.+)$/i);
+        if (!m) return jsonResponse({ error: "Missing Authorization bearer token" }, 401, corsHeaders);
+
+        let uid;
+        try {
+          const claims = await verifyFirebaseIdToken(m[1].trim(), env.FIREBASE_PROJECT_ID);
+          uid = claims.sub;
+        } catch (e) {
+          return jsonResponse({ error: `Invalid ID token: ${e.message}` }, 401, corsHeaders);
+        }
+        if (!uid) return jsonResponse({ error: "Token has no subject" }, 401, corsHeaders);
+
+        // Every key is namespaced under the verified uid, so a user can only ever
+        // delete their own files here.
+        const keys = [
+          `${uid}/apks/${buildId}.apk`,
+          `${uid}/aabs/${buildId}.aab`,
+          `${uid}/downloads/${buildId}.keystore.zip`,
+          `${uid}/signing/${buildId}/bundle.json`,
+        ];
+        try {
+          await Promise.all(keys.map((k) => env.BUCKET.delete(k)));
+        } catch (e) {
+          return jsonResponse({ error: `Delete failed: ${e.message}` }, 502, corsHeaders);
+        }
+
+        return jsonResponse({ success: true, build_id: buildId, deleted: keys }, 200, corsHeaders);
       }
 
       // ----------------------------------------------------

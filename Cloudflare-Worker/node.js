@@ -982,8 +982,7 @@ async function persistGeneratedKeystore(body, packageName, uid, env) {
     if (ks.error) return;
     const pkg = normalizePackageName(packageName) || packageName;
     if (!pkg) return;
-    const clean = ks.keystoreB64.replace(/[
-]/g, "");
+    const clean = ks.keystoreB64.replace(/\s+/g, "");
     const bytes = Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
     await env.BUCKET.put(`${uid}/keystores/${pkg}.jks`, bytes, {
       httpMetadata: { contentType: "application/octet-stream" }

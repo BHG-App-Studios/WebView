@@ -282,6 +282,7 @@ jobs:
           SIGNING_FETCH_URL: ${{ github.event.client_payload.build.signing_fetch_url }}
           PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
           BUILD_TYPE: ${{ steps.signing.outputs.build_type }}
+          SIGNING_MODE: ${{ steps.signing.outputs.signing_mode }}
           KEYSTORE_SOURCE: ${{ steps.signing.outputs.keystore_source }}
           PERSIST_KEY: ${{ steps.signing.outputs.persist_key }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
@@ -338,6 +339,23 @@ jobs:
             -H "Content-Type: application/zip" \
             --data-binary @/tmp/keystore.zip \
             || { echo "::error::keystore zip upload failed"; exit 1; }
+
+          # 1b. Record the keystore's passwords + metadata on the build's
+          #     Firestore doc (users/{uid}/builds/{buildId}.keystore) so the app
+          #     can show them and reuse this exact key for future updates. Runs
+          #     for every build; the same creds are inside the zip above.
+          #     Best-effort: a Firestore hiccup must not fail an otherwise good
+          #     build (the downloadable zip remains the source of truth).
+          KS_INFO_URL="${UPLOAD_WEBHOOK/\/api\/upload\//\/api\/keystore-info\/}"
+          curl -s -f -X POST "$KS_INFO_URL" \
+            -H "X-Build-Secret: $BUILD_SECRET" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+                  --arg f "$KS_FILE_NAME" --arg s "$STORE_PW" --arg a "$KEY_ALIAS" \
+                  --arg k "$KEY_PW" --arg t "$BUILD_TYPE" --arg m "$SIGNING_MODE" \
+                  --arg src "$KEYSTORE_SOURCE" \
+                  '{file:$f, store_password:$s, key_alias:$a, key_password:$k, build_type:$t, signing_mode:$m, source:$src}')" \
+            || echo "::warning::keystore-info post failed (non-fatal)"
 
           # 2. Persist as the per-package reuse key (release + new key only), so
           #    future builds of this package reuse the same signing key. This is

@@ -344,6 +344,43 @@ export default {
       }
 
       // ----------------------------------------------------
+      // 2e. RUNNER RECORDS KEYSTORE DETAILS ON THE BUILD DOC:
+      //     POST /api/keystore-info/:buildId?uid=...
+      //     Secret-gated. Writes the signing key's passwords + metadata into
+      //     users/{uid}/builds/{buildId}.keystore so the app can show them and
+      //     reuse the same key when updating this app later. Runs for every
+      //     build type (debug/release, auto/custom). These creds are the same
+      //     ones already inside the owner-only keystore.zip download.
+      // ----------------------------------------------------
+      if (method === "POST" && path.startsWith("/api/keystore-info/")) {
+        const authKey = request.headers.get("X-Build-Secret") || url.searchParams.get("secret");
+        if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
+          return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
+        }
+        const buildId = path.replace("/api/keystore-info/", "").trim();
+        const uid = url.searchParams.get("uid");
+        if (!uid) return jsonResponse({ error: "uid required" }, 400, corsHeaders);
+
+        const b = await request.json().catch(() => ({}));
+        const keystore = {
+          file:          String(b.file || ""),
+          storePassword: String(b.store_password || ""),
+          keyAlias:      String(b.key_alias || ""),
+          keyPassword:   String(b.key_password || ""),
+          buildType:     String(b.build_type || ""),
+          signingMode:   String(b.signing_mode || ""),
+          source:        String(b.source || ""),
+          createdAt:     new Date().toISOString()
+        };
+        try {
+          await updateBuildDoc(env, uid, buildId, { keystore, keystoreAvailable: true });
+        } catch (e) {
+          return jsonResponse({ error: `Firestore update failed: ${e.message}` }, 502, corsHeaders);
+        }
+        return jsonResponse({ success: true }, 200, corsHeaders);
+      }
+
+      // ----------------------------------------------------
       // 2b. REPORT BUILD STATUS (e.g. FAILED) FROM GITHUB ACTIONS:
       //     POST /api/report/:buildId?uid=...
       // ----------------------------------------------------
@@ -1256,6 +1293,16 @@ function toFirestoreValue(key, value) {
     return Number.isInteger(value)
       ? { integerValue: String(value) }
       : { doubleValue: value };
+  }
+  // Nested plain object -> Firestore mapValue (recursive). Null/undefined
+  // members are skipped. Used to write the `keystore` details map in one field.
+  if (value && typeof value === "object" && !Array.isArray(value)) {
+    const mapFields = {};
+    for (const [k, v] of Object.entries(value)) {
+      if (v === null || v === undefined) continue;
+      mapFields[k] = toFirestoreValue(k, v);
+    }
+    return { mapValue: { fields: mapFields } };
   }
   return { stringValue: String(value) };
 }

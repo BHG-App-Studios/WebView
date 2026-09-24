@@ -425,6 +425,9 @@ class HomeFragment : Fragment() {
         if (urlChanged || b.packageInput.text.isNullOrBlank()) {
             b.packageInput.setText(derivePackageName(confirmedUrl))
         }
+        // Sensible version defaults for a first build; the user can change them.
+        if (b.versionNameInput.text.isNullOrBlank()) b.versionNameInput.setText(DEFAULT_VERSION_NAME)
+        if (b.versionCodeInput.text.isNullOrBlank()) b.versionCodeInput.setText(DEFAULT_VERSION_CODE.toString())
         namesDerivedForUrl = confirmedUrl
     }
 
@@ -490,8 +493,28 @@ class HomeFragment : Fragment() {
 
     /** Step 1 → Step 2. App name/package are optional, so no validation is needed. */
     private fun onNextFromWebsite() {
+        // Version code, when the user typed one, must be a positive whole number.
+        // A blank field is fine — it falls back to the default at build time.
+        stepWebsiteBinding?.let { b ->
+            val vc = b.versionCodeInput.text?.toString()?.trim().orEmpty()
+            if (vc.isNotEmpty() && (vc.toLongOrNull()?.let { it >= 1 } != true)) {
+                b.versionCodeLayout.error = getString(R.string.error_version_code)
+                return
+            }
+            b.versionCodeLayout.error = null
+        }
         goToStep(STEP_FEATURES)
     }
+
+    /** User-entered version name, or the default when left blank. */
+    private fun enteredVersionName(): String =
+        stepWebsiteBinding?.versionNameInput?.text?.toString()?.trim()
+            ?.takeIf { it.isNotEmpty() } ?: DEFAULT_VERSION_NAME
+
+    /** User-entered version code (>=1), or the default when blank/invalid. */
+    private fun enteredVersionCode(): Long =
+        stepWebsiteBinding?.versionCodeInput?.text?.toString()?.trim()
+            ?.toLongOrNull()?.takeIf { it >= 1 } ?: DEFAULT_VERSION_CODE
 
     // =========================================================================
     //  Step updates
@@ -650,6 +673,12 @@ class HomeFragment : Fragment() {
                                     } else listOf("apk"),
             "signingMode"       to signingMode,
             "keystoreAvailable" to false,
+            // Generated-app version the user chose on step 1. Recorded here so a
+            // later "update" build can look it up and bump it; the CI confirms the
+            // actually-built version on this doc after the build, and the keystore
+            // details are added by the Worker post-build.
+            "versionCode"       to enteredVersionCode(),
+            "versionName"       to enteredVersionName(),
             "createdAt"         to FieldValue.serverTimestamp()
         )
 
@@ -690,6 +719,10 @@ class HomeFragment : Fragment() {
             put("url", url); put("build_id", buildId)
             if (appName.isNotEmpty())     put("app_name",     appName)
             if (packageName.isNotEmpty()) put("package_name", packageName)
+            // Version the user chose; the runner applies these to the generated
+            // app's build.gradle so the built app carries them.
+            put("version_name", enteredVersionName())
+            put("version_code", enteredVersionCode())
         }
         for (opt in featureOptions) json.put(opt.key, featureSwitches[opt.key]?.isChecked ?: opt.default)
         val toRemove = LinkedHashSet<String>()
@@ -737,6 +770,9 @@ class HomeFragment : Fragment() {
         stepEntryBinding?.entryUrlInput?.text?.clear()
         stepWebsiteBinding?.appNameInput?.text?.clear()
         stepWebsiteBinding?.packageInput?.text?.clear()
+        stepWebsiteBinding?.versionNameInput?.text?.clear()
+        stepWebsiteBinding?.versionCodeInput?.text?.clear()
+        stepWebsiteBinding?.versionCodeLayout?.error = null
         // Reset signing selections back to the defaults for the next build.
         buildType = "debug"; signingMode = "auto"; outputFormat = "apk"
         clearKeystoreSelection()
@@ -862,6 +898,10 @@ class HomeFragment : Fragment() {
 
         /** Fallback package when the host yields nothing usable (matches the Worker). */
         private const val DEFAULT_PACKAGE = "com.bhg.webview"
+
+        /** Version defaults for a first build; the build template also ships these. */
+        private const val DEFAULT_VERSION_NAME = "1.0"
+        private const val DEFAULT_VERSION_CODE = 1L
 
         /**
          * Java/Kotlin keywords that cannot be a package segment. Kept in sync with

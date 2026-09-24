@@ -61,6 +61,10 @@
     <string name="label_app_name">App name</string>
     <string name="label_package_name">Package name</string>
     <string name="package_helper">Optional. Example: com.yourcompany.app — leave blank to auto-generate from the URL</string>
+    <string name="label_version_name">Version name</string>
+    <string name="label_version_code">Version code</string>
+    <string name="version_helper">Shown to users (e.g. 1.0). The version code is a whole number that must increase with every Google Play update.</string>
+    <string name="error_version_code">Version code must be a whole number of 1 or more</string>
 
     <!-- Build type / output / signing -->
     <string name="label_build_type">Build type</string>

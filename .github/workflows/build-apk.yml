@@ -37,6 +37,8 @@ jobs:
           PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
           APP_NAME: ${{ github.event.client_payload.app_name }}
           REMOVE_PERMISSIONS: ${{ join(github.event.client_payload.remove_permissions, ' ') }}
+          VERSION_CODE: ${{ github.event.client_payload.build.version_code }}
+          VERSION_NAME: ${{ github.event.client_payload.build.version_name }}
           PAYLOAD_JSON: ${{ toJson(github.event.client_payload) }}
         run: |
           printf '%s' "$PAYLOAD_JSON" > payload.json
@@ -76,6 +78,23 @@ jobs:
             echo "=== no permissions requested for removal ==="
           fi
 
+          # 5. app version -> build.gradle versionCode / versionName. The template
+          #    ships 1 / "1.0"; the caller may override either. Patched with sed,
+          #    then re-read to prove the change landed (fail the job otherwise).
+          if [ -n "$VERSION_CODE" ]; then
+            echo "=== versionCode -> $VERSION_CODE ==="
+            sed -i -E "s/versionCode[[:space:]]+[0-9]+/versionCode $VERSION_CODE/" app/build.gradle
+            grep -qE "versionCode[[:space:]]+$VERSION_CODE([^0-9]|$)" app/build.gradle \
+              || { echo "::error::versionCode patch did not land"; exit 1; }
+          fi
+          if [ -n "$VERSION_NAME" ]; then
+            echo "=== versionName -> $VERSION_NAME ==="
+            sed -i -E "s/versionName[[:space:]]+\"[^\"]*\"/versionName \"$VERSION_NAME\"/" app/build.gradle
+            grep -qF "versionName \"$VERSION_NAME\"" app/build.gradle \
+              || { echo "::error::versionName patch did not land"; exit 1; }
+          fi
+          echo
+
       - name: Show effective configuration
         working-directory: ./Splash_WebView
         run: |
@@ -84,6 +103,7 @@ jobs:
           node ../tools/set-manifest-permissions.js
           echo
           grep -n "namespace\|applicationId" app/build.gradle
+          grep -n "versionCode\|versionName" app/build.gradle
           grep -n "app_name" app/src/main/res/values/strings.xml
 
       # ---------------------------------------------------------------------
@@ -347,14 +367,18 @@ jobs:
           #     Best-effort: a Firestore hiccup must not fail an otherwise good
           #     build (the downloadable zip remains the source of truth).
           KS_INFO_URL="${UPLOAD_WEBHOOK/\/api\/upload\//\/api\/keystore-info\/}"
+          # Read back the version actually built, so Firestore reflects the true
+          # versionCode/versionName regardless of which app version dispatched it.
+          BUILT_VC=$(grep -m1 -E 'versionCode[[:space:]]+[0-9]+' app/build.gradle | grep -oE '[0-9]+' | head -n1)
+          BUILT_VN=$(grep -m1 -E 'versionName[[:space:]]+"' app/build.gradle | sed -E 's/.*versionName[[:space:]]+"([^"]*)".*/\1/')
           curl -s -f -X POST "$KS_INFO_URL" \
             -H "X-Build-Secret: $BUILD_SECRET" \
             -H "Content-Type: application/json" \
             -d "$(jq -n \
                   --arg f "$KS_FILE_NAME" --arg s "$STORE_PW" --arg a "$KEY_ALIAS" \
                   --arg k "$KEY_PW" --arg t "$BUILD_TYPE" --arg m "$SIGNING_MODE" \
-                  --arg src "$KEYSTORE_SOURCE" \
-                  '{file:$f, store_password:$s, key_alias:$a, key_password:$k, build_type:$t, signing_mode:$m, source:$src}')" \
+                  --arg src "$KEYSTORE_SOURCE" --arg vc "$BUILT_VC" --arg vn "$BUILT_VN" \
+                  '{file:$f, store_password:$s, key_alias:$a, key_password:$k, build_type:$t, signing_mode:$m, source:$src, version_code:$vc, version_name:$vn}')" \
             || echo "::warning::keystore-info post failed (non-fatal)"
 
           # 2. Persist as the per-package reuse key (release + new key only), so

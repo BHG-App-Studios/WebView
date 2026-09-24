@@ -120,6 +120,14 @@ export default {
           return jsonResponse({ error: removal.error }, 400, corsHeaders);
         }
 
+        // Generated-app version the caller chose. Optional; falls back to the
+        // template's 1 / "1.0". The runner applies these to the built app's
+        // build.gradle so the produced app actually carries them.
+        const version = normalizeVersion(body.version_code, body.version_name);
+        if (version.error) {
+          return jsonResponse({ error: version.error }, 400, corsHeaders);
+        }
+
         const constants = Object.entries(resolved.options).map(([key, value]) => ({
           name: OPTION_SCHEMA[key].name,
           type: OPTION_SCHEMA[key].type,
@@ -145,7 +153,10 @@ export default {
           BUILD_TYPE: signing.buildType,             // "debug" | "release"
           OUTPUTS: signing.outputs,                  // ["apk"] | ["aab"] | ["apk","aab"]
           SIGNING_MODE: signing.signingMode,         // "auto" | "custom"
-          SIGNING_FETCH_URL: `${url.origin}/api/signing/${buildId}?uid=${uidParam}`
+          SIGNING_FETCH_URL: `${url.origin}/api/signing/${buildId}?uid=${uidParam}`,
+          // Generated-app version the runner writes into build.gradle.
+          VERSION_CODE: version.versionCode,         // positive integer
+          VERSION_NAME: version.versionName          // e.g. "1.0"
         };
 
         let ghDispatched = false;
@@ -372,8 +383,18 @@ export default {
           source:        String(b.source || ""),
           createdAt:     new Date().toISOString()
         };
+        // The runner also reports the version it actually built (read back from
+        // the generated app's build.gradle). Recording it here makes the build
+        // doc reflect the true built version regardless of which app version
+        // registered the build, and gives a later update build a value to bump.
+        const changes = { keystore, keystoreAvailable: true };
+        const vc = Number(b.version_code);
+        if (Number.isInteger(vc) && vc >= 1) changes.versionCode = vc;
+        if (b.version_name !== undefined && b.version_name !== null && String(b.version_name).trim() !== "") {
+          changes.versionName = String(b.version_name).trim();
+        }
         try {
-          await updateBuildDoc(env, uid, buildId, { keystore, keystoreAvailable: true });
+          await updateBuildDoc(env, uid, buildId, changes);
         } catch (e) {
           return jsonResponse({ error: `Firestore update failed: ${e.message}` }, 502, corsHeaders);
         }
@@ -854,6 +875,39 @@ function resolveOptions(body) {
 const VALID_OUTPUTS = new Set(["apk", "aab"]);
 
 /**
+ * Validates the caller's requested app version.
+ *   version_code -> a positive integer (Android's versionCode). Optional.
+ *   version_name -> a short display string like "1.0". Optional.
+ * Both fall back to the build template's defaults (1 / "1.0") when omitted, so
+ * an older app that doesn't send them still builds.
+ *
+ * @returns {{versionCode:number, versionName:string}|{error:string}}
+ */
+function normalizeVersion(rawCode, rawName) {
+  let versionCode = 1;
+  if (rawCode !== undefined && rawCode !== null && String(rawCode).trim() !== "") {
+    const n = Number(rawCode);
+    if (!Number.isInteger(n) || n < 1 || n > 2100000000) {
+      return { error: "version_code must be a whole number between 1 and 2100000000" };
+    }
+    versionCode = n;
+  }
+
+  let versionName = "1.0";
+  if (rawName !== undefined && rawName !== null && String(rawName).trim() !== "") {
+    const s = String(rawName).trim();
+    // Keep it to the characters a versionName realistically uses and cap the
+    // length so nothing odd reaches build.gradle / the manifest.
+    if (s.length > 40 || !/^[A-Za-z0-9.\-_ ]+$/.test(s)) {
+      return { error: "version_name may be up to 40 chars: letters, digits, dot, dash, underscore, space" };
+    }
+    versionName = s;
+  }
+
+  return { versionCode, versionName };
+}
+
+/**
  * Validates build type, outputs and signing choice, and - for a custom
  * keystore - stashes the uploaded keystore + passwords in R2 so the runner can
  * fetch them without them ever touching the dispatch payload.
@@ -992,7 +1046,9 @@ async function triggerGitHubAction(env, buildConfig) {
           build_type: buildConfig.BUILD_TYPE,
           outputs: buildConfig.OUTPUTS,
           signing_mode: buildConfig.SIGNING_MODE,
-          signing_fetch_url: buildConfig.SIGNING_FETCH_URL
+          signing_fetch_url: buildConfig.SIGNING_FETCH_URL,
+          version_code: buildConfig.VERSION_CODE,
+          version_name: buildConfig.VERSION_NAME
         }
       }
     })

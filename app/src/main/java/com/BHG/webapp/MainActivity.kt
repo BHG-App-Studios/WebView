@@ -104,6 +104,14 @@ class MainActivity : AppCompatActivity() {
         }
         syncNavSelection()
         setupBackPress()
+
+        // When an overlay (Trash) is popped off the back stack, bring the capsule
+        // nav back with a smooth slide.
+        supportFragmentManager.addOnBackStackChangedListener {
+            if (supportFragmentManager.backStackEntryCount == 0) {
+                setBottomNavVisible(true, animate = true)
+            }
+        }
     }
 
     private fun applyInsets() {
@@ -235,7 +243,8 @@ class MainActivity : AppCompatActivity() {
      * Back button (and the screen's own Back arrow) returns to My Apps.
      */
     fun showTrash() {
-        setBottomNavVisible(true, animate = false)
+        // Trash is a full-screen overlay: slide the capsule nav away while it's up.
+        setBottomNavVisible(false, animate = true)
         supportFragmentManager.beginTransaction()
             .setReorderingAllowed(true)
             .replace(R.id.fragmentContainer, TrashFragment())
@@ -262,6 +271,13 @@ class MainActivity : AppCompatActivity() {
                 // and return to the tab beneath instead of the exit prompt.
                 if (supportFragmentManager.backStackEntryCount > 0) {
                     supportFragmentManager.popBackStack()
+                    return
+                }
+
+                // From any tab other than the landing wizard, Back returns there
+                // rather than prompting to exit.
+                if (currentTab != R.id.nav_landing) {
+                    goToTab(R.id.nav_landing)
                     return
                 }
 
@@ -354,18 +370,6 @@ class MainActivity : AppCompatActivity() {
         db.collection("users").document(user.uid)
             .set(profile, SetOptions.merge())
             .addOnFailureListener { e -> Log.w(TAG, "Profile save failed: ${e.message}") }
-    }
-
-    @Deprecated("Base API deprecated; drawer + tab back handling still needed here")
-    override fun onBackPressed() {
-        if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
-            binding.drawerLayout.closeDrawer(GravityCompat.START)
-        } else if (currentTab != R.id.nav_landing) {
-            goToTab(R.id.nav_landing)
-        } else {
-            @Suppress("DEPRECATION")
-            super.onBackPressed()
-        }
     }
 
     override fun onSaveInstanceState(outState: Bundle) {

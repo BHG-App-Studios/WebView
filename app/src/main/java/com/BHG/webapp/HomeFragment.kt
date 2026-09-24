@@ -76,6 +76,9 @@ class HomeFragment : Fragment() {
     private var customKeystoreB64: String? = null
     private var customKeystoreName: String? = null
 
+    /** The URL the app name + package fields were last auto-derived from. */
+    private var namesDerivedForUrl: String? = null
+
     /** SAF picker for the custom keystore file. */
     private lateinit var keystorePicker: ActivityResultLauncher<Array<String>>
 
@@ -260,6 +263,9 @@ class HomeFragment : Fragment() {
                     val b = StepWebsiteBinding.inflate(inf, parent, false)
                     stepWebsiteBinding = b
                     setupSigningControls(b)
+                    // If the URL was already confirmed before this page existed,
+                    // fill in the derived app name + package now.
+                    if (confirmedUrl.isNotEmpty()) prefillNamesFromUrl()
                     StepVH(b.root)
                 }
                 STEP_FEATURES -> {
@@ -386,6 +392,67 @@ class HomeFragment : Fragment() {
         }
     }
 
+    // =========================================================================
+    //  App name / package auto-derivation (client-side preview of what the
+    //  server would generate, so the details page is never blank). The Worker
+    //  re-derives from the same rules when a field is sent empty, so anything
+    //  the user leaves blank is still handled server-side.
+    // =========================================================================
+
+    /**
+     * Fills the app-name and package fields from [confirmedUrl]. A field is
+     * (re)filled when it is empty, or when the confirmed URL changed since the
+     * last derivation — so user edits survive navigating back and forth, but a
+     * new URL produces fresh suggestions.
+     */
+    private fun prefillNamesFromUrl() {
+        val b = stepWebsiteBinding ?: return
+        if (confirmedUrl.isEmpty()) return
+        val urlChanged = namesDerivedForUrl != confirmedUrl
+        if (urlChanged || b.appNameInput.text.isNullOrBlank()) {
+            b.appNameInput.setText(deriveAppName(confirmedUrl))
+        }
+        if (urlChanged || b.packageInput.text.isNullOrBlank()) {
+            b.packageInput.setText(derivePackageName(confirmedUrl))
+        }
+        namesDerivedForUrl = confirmedUrl
+    }
+
+    private fun hostOf(url: String): String? =
+        runCatching { Uri.parse(url).host?.lowercase() }.getOrNull()?.takeIf { it.isNotEmpty() }
+
+    /** First meaningful host label (skips "www"), e.g. "www.google.com" -> "google". */
+    private fun siteLabel(host: String): String? =
+        host.split(".").firstOrNull { it.isNotEmpty() && it != "www" }
+
+    /**
+     * A friendly app name from the URL: the site label, split on non-alphanumeric
+     * separators and title-cased ("my-cool-site.com" -> "My Cool Site"). Falls
+     * back to the bare host when nothing usable is found.
+     */
+    private fun deriveAppName(url: String): String {
+        val host = hostOf(url) ?: return ""
+        val label = siteLabel(host) ?: return host.take(50)
+        val words = label.split(Regex("[^a-z0-9]+")).filter { it.isNotEmpty() }
+        if (words.isEmpty()) return host.take(50)
+        return words.joinToString(" ") { w -> w.replaceFirstChar { it.uppercase() } }.take(50)
+    }
+
+    /**
+     * Mirrors the Worker's packageNameFromHost so the app previews the exact
+     * package the server would generate: com.{site}.webview.
+     */
+    private fun derivePackageName(url: String): String {
+        val host = hostOf(url) ?: return DEFAULT_PACKAGE
+        val labels = host.split(".").filter { it.isNotEmpty() && it != "www" }
+        var name = (labels.firstOrNull() ?: "").replace(Regex("[^a-z0-9]"), "")
+        if (name.length < 2) return DEFAULT_PACKAGE
+        if (!name.first().isLetter()) name = "x$name"
+        if (name in RESERVED_PACKAGE_WORDS) name = name + "app"
+        if (name.length > 50) name = name.substring(0, 50)
+        return "com.$name.webview"
+    }
+
     private fun queryDisplayName(uri: Uri): String? = runCatching {
         requireContext().contentResolver.query(uri, null, null, null, null)?.use { c ->
             val idx = c.getColumnIndex(android.provider.OpenableColumns.DISPLAY_NAME)
@@ -487,6 +554,10 @@ class HomeFragment : Fragment() {
                 // carry over a keystore picked for a previous attempt. Nothing
                 // about the last selection is stored.
                 clearKeystoreSelection()
+                // Prefill app name + package from the URL so the details page
+                // is never blank. The user can edit or clear them (a cleared
+                // field is auto-filled server-side at build time).
+                prefillNamesFromUrl()
                 goToStep(STEP_WEBSITE)
             } else {
                 entry.entryUrlLayout.error = getString(R.string.error_url_unreachable)
@@ -646,6 +717,7 @@ class HomeFragment : Fragment() {
     private fun resetWizard() {
         buildDispatching = false
         confirmedUrl = ""
+        namesDerivedForUrl = null
         stepPermissionsBinding?.let { b ->
             b.ownershipCheckbox.isChecked = false
             b.buildButton.isEnabled = false
@@ -773,5 +845,25 @@ class HomeFragment : Fragment() {
         super.onDestroyView()
     }
 
-    private companion object { private const val TAG = "HomeFragment" }
+    private companion object {
+        private const val TAG = "HomeFragment"
+
+        /** Fallback package when the host yields nothing usable (matches the Worker). */
+        private const val DEFAULT_PACKAGE = "com.bhg.webview"
+
+        /**
+         * Java/Kotlin keywords that cannot be a package segment. Kept in sync with
+         * the Worker's RESERVED_WORDS so the previewed package matches what the
+         * server accepts (a reserved site label gets "app" appended instead).
+         */
+        private val RESERVED_PACKAGE_WORDS = setOf(
+            "abstract", "assert", "boolean", "break", "byte", "case", "catch", "char", "class",
+            "const", "continue", "default", "do", "double", "else", "enum", "extends", "final",
+            "finally", "float", "for", "goto", "if", "implements", "import", "instanceof", "int",
+            "interface", "long", "native", "new", "package", "private", "protected", "public",
+            "return", "short", "static", "strictfp", "super", "switch", "synchronized", "this",
+            "throw", "throws", "transient", "try", "void", "volatile", "while",
+            "as", "fun", "in", "is", "object", "typealias", "val", "var", "when"
+        )
+    }
 }

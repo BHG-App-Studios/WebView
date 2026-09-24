@@ -116,10 +116,13 @@ jobs:
           echo "build_type=$BUILD_TYPE"   >> "$GITHUB_OUTPUT"
           echo "signing_mode=$SIGNING_MODE" >> "$GITHUB_OUTPUT"
 
-          # Debug + auto: nothing to do; the debug keystore signs it.
+          # Debug + auto: nothing to sign here; Gradle's default debug keystore
+          # (~/.android/debug.keystore) signs it. We still package that keystore
+          # for download in the "Persist & package keystore" step below.
           if [ "$BUILD_TYPE" = "debug" ] && [ "$SIGNING_MODE" = "auto" ]; then
             echo "Debug build with auto (debug) keystore - no custom signing."
-            echo "generated_keystore=false" >> "$GITHUB_OUTPUT"
+            echo "keystore_source=debug-default" >> "$GITHUB_OUTPUT"
+            echo "persist_key=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
 
@@ -183,7 +186,21 @@ jobs:
           } >> "$GITHUB_ENV"
           echo "::add-mask::$STORE_PW"
           echo "::add-mask::$KEY_PW"
-          echo "generated_keystore=$GENERATED" >> "$GITHUB_OUTPUT"
+
+          # A concrete keystore file now exists at app/release.jks (custom
+          # upload, reused, or freshly generated). It is packaged for download
+          # in the "Persist & package keystore" step below.
+          echo "keystore_source=release-jks" >> "$GITHUB_OUTPUT"
+
+          # Persist as the per-package reuse key ONLY for release builds whose
+          # key is not already stored server-side: custom uploads and freshly
+          # generated keys. Reused release keys are already stored; a debug key
+          # must never become a package's release signing key.
+          PERSIST=false
+          if [ "$BUILD_TYPE" = "release" ] && { [ "$SIGNING_MODE" = "custom" ] || [ "$GENERATED" = "true" ]; }; then
+            PERSIST=true
+          fi
+          echo "persist_key=$PERSIST" >> "$GITHUB_OUTPUT"
 
       - name: Build the app
         working-directory: ./Splash_WebView
@@ -251,48 +268,70 @@ jobs:
             put_artifact "$AAB_PATH" aab "application/octet-stream"
           fi
 
-      # Only for auto-generated keystores: persist the .jks + creds for reuse,
-      # and package a downloadable zip (jks + credentials.txt) for the user.
-      - name: Persist & package generated keystore
-        if: steps.signing.outputs.generated_keystore == 'true'
+      # Package the signing key used by THIS build into a downloadable zip
+      # (keystore + credentials.txt) and, for release builds with a new key,
+      # persist it as the per-package reuse key. Runs for every build type:
+      #   debug  + auto   -> Gradle's default debug keystore (~/.android)
+      #   debug  + custom -> the uploaded keystore        (app/release.jks)
+      #   release + *     -> custom / reused / generated  (app/release.jks)
+      - name: Persist & package keystore
+        if: steps.signing.outputs.keystore_source != ''
         working-directory: ./Splash_WebView
         env:
           UPLOAD_WEBHOOK: ${{ github.event.client_payload.upload_webhook_url }}
           SIGNING_FETCH_URL: ${{ github.event.client_payload.build.signing_fetch_url }}
           PACKAGE_NAME: ${{ github.event.client_payload.package_name }}
+          BUILD_TYPE: ${{ steps.signing.outputs.build_type }}
+          KEYSTORE_SOURCE: ${{ steps.signing.outputs.keystore_source }}
+          PERSIST_KEY: ${{ steps.signing.outputs.persist_key }}
           BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
         run: |
-          KS_PATH="$PWD/app/release.jks"
+          if [ "$KEYSTORE_SOURCE" = "debug-default" ]; then
+            # Android's default debug keystore, created by Gradle during the
+            # debug build. Its credentials are the well-known fixed values.
+            KS_PATH="$HOME/.android/debug.keystore"
+            STORE_PW=android
+            KEY_ALIAS=androiddebugkey
+            KEY_PW=android
+            KS_FILE_NAME="debug.keystore"
+            if [ ! -f "$KS_PATH" ]; then
+              echo "Default debug keystore missing; generating one."
+              mkdir -p "$HOME/.android"
+              keytool -genkeypair -v \
+                -keystore "$KS_PATH" \
+                -alias "$KEY_ALIAS" \
+                -keyalg RSA -keysize 2048 -validity 10000 \
+                -storepass "$STORE_PW" -keypass "$KEY_PW" \
+                -dname "CN=Android Debug, O=Android, C=US"
+            fi
+          else
+            # Custom / reused / generated release key written by the signing
+            # step. STORE_PW / KEY_ALIAS / KEY_PW are already in the env.
+            KS_PATH="$PWD/app/release.jks"
+            KS_FILE_NAME="release.jks"
+          fi
 
-          # 1. Persist the .jks bytes for this package (reuse on future builds).
-          curl -s -f -X PUT "${UPLOAD_WEBHOOK}&type=package-key&pkgkey=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PACKAGE_NAME']))")" \
-            -H "X-Build-Secret: $BUILD_SECRET" \
-            -H "Content-Type: application/octet-stream" \
-            --data-binary @"$KS_PATH" || { echo "::error::keystore persist failed"; exit 1; }
+          echo "::add-mask::$STORE_PW"
+          echo "::add-mask::$KEY_PW"
 
-          # 2. Persist its credentials (paired with the .jks). Keep the ?uid=
-          #    query from the signing URL so the Worker stores under {uid}/.
-          CREDS_URL="${SIGNING_FETCH_URL%%\?*}/creds?${SIGNING_FETCH_URL#*\?}"
-          curl -s -f -X POST "$CREDS_URL" \
-            -H "X-Build-Secret: $BUILD_SECRET" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n --arg p "$PACKAGE_NAME" --arg s "$STORE_PW" --arg a "$KEY_ALIAS" --arg k "$KEY_PW" \
-                  '{package:$p, store_password:$s, key_alias:$a, key_password:$k}')" \
-            || { echo "::error::creds persist failed"; exit 1; }
+          if [ ! -f "$KS_PATH" ]; then
+            echo "::error::Keystore file not found at $KS_PATH"; exit 1
+          fi
 
-          # 3. Build the user-downloadable bundle: keystore + a readme of creds.
+          # 1. Build the user-downloadable bundle: keystore + a readme of creds.
           cat > /tmp/credentials.txt <<EOF
           Keep this file safe. You need this exact keystore to publish updates
           to your app - a different keystore cannot update it on Google Play.
 
           Package:        $PACKAGE_NAME
-          Keystore file:  release.jks
+          Build type:     $BUILD_TYPE
+          Keystore file:  $KS_FILE_NAME
           Store password: $STORE_PW
           Key alias:      $KEY_ALIAS
           Key password:   $KEY_PW
           EOF
-          cp "$KS_PATH" /tmp/release.jks
-          (cd /tmp && zip -q keystore.zip release.jks credentials.txt)
+          cp "$KS_PATH" "/tmp/$KS_FILE_NAME"
+          (cd /tmp && zip -q keystore.zip "$KS_FILE_NAME" credentials.txt)
 
           curl -s -f -X PUT "${UPLOAD_WEBHOOK}&type=keystore" \
             -H "X-Build-Secret: $BUILD_SECRET" \
@@ -300,12 +339,33 @@ jobs:
             --data-binary @/tmp/keystore.zip \
             || { echo "::error::keystore zip upload failed"; exit 1; }
 
+          # 2. Persist as the per-package reuse key (release + new key only), so
+          #    future builds of this package reuse the same signing key. This is
+          #    the same store that auto-generated keys are saved to.
+          if [ "$PERSIST_KEY" = "true" ]; then
+            curl -s -f -X PUT "${UPLOAD_WEBHOOK}&type=package-key&pkgkey=$(python3 -c "import urllib.parse,os;print(urllib.parse.quote(os.environ['PACKAGE_NAME']))")" \
+              -H "X-Build-Secret: $BUILD_SECRET" \
+              -H "Content-Type: application/octet-stream" \
+              --data-binary @"$KS_PATH" || { echo "::error::keystore persist failed"; exit 1; }
+
+            # Keep the ?uid= query from the signing URL so the Worker stores the
+            # creds under {uid}/, paired with the .jks bytes above.
+            CREDS_URL="${SIGNING_FETCH_URL%%\?*}/creds?${SIGNING_FETCH_URL#*\?}"
+            curl -s -f -X POST "$CREDS_URL" \
+              -H "X-Build-Secret: $BUILD_SECRET" \
+              -H "Content-Type: application/json" \
+              -d "$(jq -n --arg p "$PACKAGE_NAME" --arg s "$STORE_PW" --arg a "$KEY_ALIAS" --arg k "$KEY_PW" \
+                    '{package:$p, store_password:$s, key_alias:$a, key_password:$k}')" \
+              || { echo "::error::creds persist failed"; exit 1; }
+          fi
+
       - name: Clean up signing material
         if: always()
         working-directory: ./Splash_WebView
         run: |
           rm -f app/keystore.properties app/release.jks /tmp/signing.json \
-                /tmp/release.jks /tmp/credentials.txt /tmp/keystore.zip || true
+                /tmp/release.jks /tmp/debug.keystore /tmp/credentials.txt \
+                /tmp/keystore.zip || true
 
       # Runs only if any earlier step failed (customise, build, or upload).
       # Reports FAILED to the Worker so the app's Firestore listener stops

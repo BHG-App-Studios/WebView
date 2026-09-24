@@ -139,6 +139,11 @@ class HomeFragment : Fragment() {
         keystorePicker = registerForActivityResult(
             ActivityResultContracts.OpenDocument()
         ) { uri -> if (uri != null) onKeystorePicked(uri) }
+
+        // Receive keystores generated on-device by the create-keystore sheet.
+        parentFragmentManager.setFragmentResultListener(
+            KeystoreCreateSheet.RESULT_KEY, this
+        ) { _, bundle -> onKeystoreGenerated(bundle) }
     }
 
     override fun onCreateView(
@@ -391,6 +396,31 @@ class HomeFragment : Fragment() {
             // validate on read.
             keystorePicker.launch(arrayOf("*/*"))
         }
+
+        b.createKeystoreButton.setOnClickListener {
+            KeystoreCreateSheet().show(parentFragmentManager, KeystoreCreateSheet.TAG)
+        }
+    }
+
+    /** Applies a keystore generated on-device by [KeystoreCreateSheet]. */
+    private fun onKeystoreGenerated(bundle: Bundle) {
+        val b = stepSigningBinding ?: return
+        val b64 = bundle.getString(KeystoreCreateSheet.ARG_B64).orEmpty()
+        if (b64.isEmpty()) return
+        val alias = bundle.getString(KeystoreCreateSheet.ARG_ALIAS).orEmpty()
+        val storePw = bundle.getString(KeystoreCreateSheet.ARG_STORE_PW).orEmpty()
+        val keyPw = bundle.getString(KeystoreCreateSheet.ARG_KEY_PW).orEmpty()
+
+        customKeystoreB64 = b64
+        customKeystoreName = "$alias.p12"
+        // Fill the credential fields so the existing validation + dispatch path
+        // sends the passwords that match the generated keystore.
+        b.storePwInput.setText(storePw)
+        b.keyAliasInput.setText(alias)
+        b.keyPwInput.setText(keyPw)
+        b.keystoreFileName.visibility = View.VISIBLE
+        b.keystoreFileName.text = getString(R.string.keystore_generated, customKeystoreName)
+        toast(R.string.keystore_create_ok)
     }
 
     /** Reads the picked keystore into base64 and shows its name. */

@@ -91,6 +91,26 @@
     <string name="keystore_fields_required">Enter the store password and key alias for your keystore</string>
     <string name="keystore_read_failed">Could not read the selected keystore file</string>
     <string name="keystore_selected">Selected: %1$s</string>
+    <string name="keystore_generated">Generated: %1$s</string>
+    <!-- Create-keystore (on-device generation) -->
+    <string name="keystore_create">Create new keystore</string>
+    <string name="keystore_create_title">Create a keystore</string>
+    <string name="keystore_create_subtitle">We generate a signing key right on your device from the details below. Keep the passwords safe — you need this exact keystore to publish updates.</string>
+    <string name="keystore_create_generate">Generate keystore</string>
+    <string name="keystore_create_generating">Generating…</string>
+    <string name="keystore_field_name">First and last name</string>
+    <string name="keystore_field_org_unit">Organizational unit</string>
+    <string name="keystore_field_org">Organization</string>
+    <string name="keystore_field_city">City or locality</string>
+    <string name="keystore_field_state">State or province</string>
+    <string name="keystore_field_country">Two-letter country code</string>
+    <string name="keystore_create_alias_default">upload</string>
+    <string name="keystore_create_pw_short">Store password must be at least 6 characters</string>
+    <string name="keystore_create_country_len">Country code must be exactly two letters (e.g. IN)</string>
+    <string name="keystore_create_name_required">Enter a first and last name</string>
+    <string name="keystore_create_alias_required">Enter a key alias</string>
+    <string name="keystore_create_ok">Keystore created — you can build now</string>
+    <string name="keystore_create_failed">Could not create the keystore. Please try again.</string>
     <string name="download_keystore">Download keystore</string>
     <string name="download_aab">Download AAB</string>
 

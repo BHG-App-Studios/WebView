@@ -11,3 +11,9 @@
 # ---- Firebase Auth ----
 # Firebase/GMS already ship consumer ProGuard rules, but keep GoogleAuthProvider defensively.
 -keep class com.google.firebase.auth.** { *; }
+
+# BouncyCastle — used for on-device keystore (X.509 cert) generation.
+# Keep its providers/classes and silence warnings about optional JCA deps.
+-keep class org.bouncycastle.** { *; }
+-dontwarn org.bouncycastle.**
+-dontwarn javax.naming.**

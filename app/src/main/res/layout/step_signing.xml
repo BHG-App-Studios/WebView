@@ -220,6 +220,15 @@
                 app:icon="@drawable/ic_arrow_forward"
                 android:text="@string/keystore_pick" />
 
+            <com.google.android.material.button.MaterialButton
+                android:id="@+id/createKeystoreButton"
+                style="?attr/materialButtonOutlinedStyle"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="10dp"
+                app:icon="@drawable/ic_key"
+                android:text="@string/keystore_create" />
+
             <TextView
                 android:id="@+id/keystoreFileName"
                 android:layout_width="match_parent"

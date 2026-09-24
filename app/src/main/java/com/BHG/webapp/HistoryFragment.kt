@@ -239,7 +239,7 @@ class HistoryFragment : Fragment() {
 
     private fun failTrashOp(e: Exception) {
         Log.w(TAG, "Move to trash failed: ${e.message}", e)
-        if (isAdded) Toast.makeText(requireContext(), "Trash failed: ${e.message}", Toast.LENGTH_LONG).show()
+        if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
     }
 
     private fun openInBrowser(uri: Uri) {

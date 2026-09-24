@@ -13,7 +13,9 @@ import android.widget.Toast
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.LinearLayoutManager
 import com.BHG.webapp.databinding.FragmentHistoryBinding
+import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.google.firebase.auth.FirebaseAuth
+import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import com.google.firebase.firestore.ListenerRegistration
 import com.google.firebase.firestore.Query
@@ -49,9 +51,11 @@ class HistoryFragment : Fragment() {
             onDownload = ::download,
             onDownloadAab = ::downloadAab,
             onDownloadKeystore = ::downloadKeystore,
-            onUpdate = ::update
+            onUpdate = ::update,
+            onDelete = ::confirmMoveToTrash
         )
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
+        binding.topBarTrash.setOnClickListener { (activity as? MainActivity)?.showTrash() }
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
         binding.historyList.adapter = adapter
         loadBuilds()
@@ -191,6 +195,51 @@ class HistoryFragment : Fragment() {
                 versionCode = (if (item.versionCode > 0) item.versionCode else 1L) + 1
             )
         )
+    }
+
+    /**
+     * Confirm, then move the app to Trash. This is an app-side move only: the
+     * Firestore doc is copied from users/{uid}/builds to users/{uid}/trashApps
+     * and removed from builds. No files on the server are touched — the app can
+     * still be restored, and only a permanent delete from Trash wipes its data.
+     */
+    private fun confirmMoveToTrash(item: BuildItem) {
+        val name = item.appName.ifEmpty { getString(R.string.app_display_name) }
+        MaterialAlertDialogBuilder(requireContext())
+            .setTitle(R.string.delete_to_trash_title)
+            .setMessage(getString(R.string.delete_to_trash_message, name))
+            .setNegativeButton(R.string.action_cancel, null)
+            .setPositiveButton(R.string.action_delete) { _, _ -> moveToTrash(item) }
+            .show()
+    }
+
+    private fun moveToTrash(item: BuildItem) {
+        val user = auth?.currentUser ?: return
+        val db = firestore ?: return
+        val builds = db.collection("users").document(user.uid).collection("builds")
+        val trash = db.collection("users").document(user.uid).collection("trashApps")
+
+        builds.document(item.buildId).get()
+            .addOnSuccessListener { snap ->
+                if (!isAdded) return@addOnSuccessListener
+                val data = HashMap(snap.data ?: emptyMap())
+                data["trashedAt"] = FieldValue.serverTimestamp()
+                trash.document(item.buildId).set(data)
+                    .addOnSuccessListener {
+                        builds.document(item.buildId).delete()
+                            .addOnSuccessListener {
+                                if (isAdded) Toast.makeText(requireContext(), R.string.moved_to_trash, Toast.LENGTH_SHORT).show()
+                            }
+                            .addOnFailureListener { failTrashOp(it) }
+                    }
+                    .addOnFailureListener { failTrashOp(it) }
+            }
+            .addOnFailureListener { failTrashOp(it) }
+    }
+
+    private fun failTrashOp(e: Exception) {
+        Log.w(TAG, "Move to trash failed: ${e.message}", e)
+        if (isAdded) Toast.makeText(requireContext(), "Trash failed: ${e.message}", Toast.LENGTH_LONG).show()
     }
 
     private fun openInBrowser(uri: Uri) {

@@ -99,6 +99,7 @@
     <string name="action_keystore">Keystore</string>
     <string name="action_update">Update</string>
     <string name="action_download">Download</string>
+    <string name="action_delete">Delete</string>
     <string name="info_url">Website</string>
     <string name="info_package">Package</string>
     <string name="info_version">Version</string>
@@ -110,6 +111,26 @@
     <string name="info_features">Features</string>
     <string name="info_permissions">Permissions</string>
     <string name="update_prefilled">Update started — review the details and build a new version.</string>
+
+    <!-- Trash -->
+    <string name="title_trash">Trash</string>
+    <string name="open_trash">Open trash</string>
+    <string name="action_restore">Restore</string>
+    <string name="action_delete_forever">Delete forever</string>
+    <string name="trash_empty_title">Trash is empty</string>
+    <string name="trash_empty_subtitle">Apps you delete are moved here. You can restore them or delete them permanently.</string>
+    <string name="delete_to_trash_title">Move to Trash?</string>
+    <string name="delete_to_trash_message">\"%1$s\" will be moved to Trash. You can restore it later, or delete it permanently from there.</string>
+    <string name="delete_forever_title">Delete permanently?</string>
+    <string name="delete_forever_message">\"%1$s\" and all of its files (APK, AAB and keystore) will be permanently deleted. This cannot be undone.</string>
+    <string name="restore_title">Restore app?</string>
+    <string name="restore_message">\"%1$s\" will be moved back to My Apps.</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="moved_to_trash">Moved to Trash</string>
+    <string name="restored_from_trash">Restored to My Apps</string>
+    <string name="deleted_forever">Permanently deleted</string>
+    <string name="delete_failed">Couldn\'t complete that. Please try again.</string>
+    <string name="deleting">Deleting…</string>
     <string name="section_features">Features</string>
     <string name="section_permissions">Permissions</string>
     <string name="section_permissions_hint">Turn off anything your app does not need. Internet access is always included.</string>

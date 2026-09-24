@@ -6,8 +6,7 @@
     android:background="@color/home_content_bg"
     android:orientation="vertical">
 
-    <!-- 64dp solid top bar, owned by this fragment — the reference app's list-screen
-         pattern (fragment_hukamnama_list.xml), with the drawer button in place of Back. -->
+    <!-- 64dp solid top bar with a Back button (returns to My Apps). -->
     <LinearLayout
         android:id="@+id/topBar"
         android:layout_width="match_parent"
@@ -20,14 +19,14 @@
         android:paddingBottom="9dp">
 
         <ImageButton
-            android:id="@+id/topBarMenu"
+            android:id="@+id/topBarBack"
             android:layout_width="40dp"
             android:layout_height="40dp"
             android:layout_marginEnd="8dp"
             android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/open_menu"
+            android:contentDescription="@string/action_cancel"
             android:padding="8dp"
-            android:src="@drawable/ic_menu"
+            android:src="@drawable/ic_arrow_back"
             app:tint="@color/top_bar_icon" />
 
         <TextView
@@ -36,21 +35,10 @@
             android:layout_height="wrap_content"
             android:layout_weight="1"
             android:fontFamily="@font/roboto_bold"
-            android:text="@string/title_history"
+            android:text="@string/title_trash"
             android:textColor="@color/top_bar_title"
             android:textSize="@dimen/text_size_20"
             android:textStyle="bold" />
-
-        <ImageButton
-            android:id="@+id/topBarTrash"
-            android:layout_width="40dp"
-            android:layout_height="40dp"
-            android:layout_marginEnd="4dp"
-            android:background="?attr/selectableItemBackgroundBorderless"
-            android:contentDescription="@string/open_trash"
-            android:padding="8dp"
-            android:src="@drawable/ic_delete"
-            app:tint="@color/top_bar_icon" />
     </LinearLayout>
 
     <FrameLayout
@@ -59,7 +47,7 @@
         android:layout_weight="1">
 
         <androidx.recyclerview.widget.RecyclerView
-            android:id="@+id/historyList"
+            android:id="@+id/trashList"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:clipToPadding="false"
@@ -70,7 +58,7 @@
             android:scrollbars="none" />
 
         <ProgressBar
-            android:id="@+id/historyProgress"
+            android:id="@+id/trashProgress"
             android:layout_width="36dp"
             android:layout_height="36dp"
             android:layout_gravity="center"
@@ -101,7 +89,7 @@
                     android:layout_width="40dp"
                     android:layout_height="40dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_history"
+                    android:src="@drawable/ic_delete"
                     app:tint="?attr/colorPrimary" />
             </FrameLayout>
 
@@ -109,7 +97,7 @@
                 android:layout_width="wrap_content"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="18dp"
-                android:text="@string/history_empty_title"
+                android:text="@string/trash_empty_title"
                 android:textAppearance="?attr/textAppearanceTitleMedium"
                 android:textColor="?attr/colorOnSurface" />
 
@@ -118,7 +106,7 @@
                 android:layout_height="wrap_content"
                 android:layout_marginTop="6dp"
                 android:gravity="center"
-                android:text="@string/history_empty_subtitle"
+                android:text="@string/trash_empty_subtitle"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorOnSurfaceVariant" />
         </LinearLayout>

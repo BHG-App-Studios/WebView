@@ -34,7 +34,7 @@
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_gravity="center"
-                    android:src="@drawable/ic_apps"
+                    android:src="@drawable/ic_delete"
                     app:tint="?attr/colorPrimary" />
             </FrameLayout>
 
@@ -111,7 +111,7 @@
             android:background="?attr/colorOutlineVariant"
             android:alpha="0.5" />
 
-        <!-- Action bar: Info · Keystore · Update · Download -->
+        <!-- Action bar: Info · Restore · Delete forever -->
         <LinearLayout
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -137,7 +137,7 @@
                 app:iconPadding="2dp" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/itemDownloadKeystore"
+                android:id="@+id/itemRestore"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
@@ -147,31 +147,14 @@
                 android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:textSize="11sp"
-                android:text="@string/action_keystore"
-                app:icon="@drawable/ic_key"
-                app:iconGravity="top"
-                app:iconSize="20dp"
-                app:iconPadding="2dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/itemUpdate"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp"
-                android:textSize="11sp"
-                android:text="@string/action_update"
+                android:text="@string/action_restore"
                 app:icon="@drawable/ic_update"
                 app:iconGravity="top"
                 app:iconSize="20dp"
                 app:iconPadding="2dp" />
 
             <com.google.android.material.button.MaterialButton
-                android:id="@+id/itemDownload"
+                android:id="@+id/itemDeleteForever"
                 style="@style/Widget.Material3.Button.TextButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
@@ -181,25 +164,10 @@
                 android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:textSize="11sp"
-                android:text="@string/action_download"
-                app:icon="@drawable/ic_download_2"
-                app:iconGravity="top"
-                app:iconSize="20dp"
-                app:iconPadding="2dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/itemDelete"
-                style="@style/Widget.Material3.Button.TextButton"
-                android:layout_width="0dp"
-                android:layout_weight="1"
-                android:layout_height="wrap_content"
-                android:insetTop="0dp"
-                android:insetBottom="0dp"
-                android:paddingStart="2dp"
-                android:paddingEnd="2dp"
-                android:textSize="11sp"
-                android:text="@string/action_delete"
-                app:icon="@drawable/ic_delete"
+                android:textColor="@color/error"
+                app:iconTint="@color/error"
+                android:text="@string/action_delete_forever"
+                app:icon="@drawable/ic_delete_forever"
                 app:iconGravity="top"
                 app:iconSize="20dp"
                 app:iconPadding="2dp" />
@@ -227,21 +195,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/itemDownloadAab"
-                style="?attr/materialButtonOutlinedStyle"
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:layout_marginTop="10dp"
-                android:minHeight="0dp"
-                android:paddingTop="4dp"
-                android:paddingBottom="4dp"
-                android:textSize="12sp"
-                app:icon="@drawable/ic_download_2"
-                app:iconSize="16dp"
-                android:text="@string/download_aab"
-                android:visibility="gone" />
         </LinearLayout>
     </LinearLayout>
 </com.google.android.material.card.MaterialCardView>

@@ -84,6 +84,33 @@ object BuildApi {
     }
 
     /**
+     * Permanently deletes an app's server-side files (APK, AAB and keystore) via
+     * DELETE /api/app/:buildId. Owner-only: the caller's Firebase ID token scopes
+     * the deletion to their own R2 folder. Callbacks fire on the main thread.
+     */
+    fun deleteApp(
+        buildId: String,
+        idToken: String,
+        onSuccess: () -> Unit,
+        onError: (String) -> Unit
+    ) {
+        executor.execute {
+            try {
+                val (code, text) = send("DELETE", "$BASE_URL/api/app/$buildId", idToken)
+                val json = parse(text)
+                if (code in 200..299 && (json == null || json.optBoolean("success", true))) {
+                    mainHandler.post { onSuccess() }
+                } else {
+                    val serverError = json?.optString("error").orEmpty()
+                    postError(onError, serverError.ifEmpty { "Delete failed ($code)" })
+                }
+            } catch (e: Exception) {
+                postError(onError, e.message ?: "Network error")
+            }
+        }
+    }
+
+    /**
      * Checks whether [urlString] is reachable, on a background thread, calling back
      * on the main thread. Tries a lightweight HEAD first and falls back to GET (some
      * servers reject HEAD). Any 2xx/3xx — or even a 4xx that isn't 404 — counts as
@@ -129,6 +156,22 @@ object BuildApi {
         }
         return try {
             conn.outputStream.use { it.write(body.toByteArray(Charsets.UTF_8)) }
+            conn.code() to conn.readBody()
+        } finally {
+            conn.disconnect()
+        }
+    }
+
+    /** Sends a bodyless authenticated request (e.g. DELETE) and reads the reply. */
+    private fun send(method: String, urlString: String, idToken: String): Pair<Int, String> {
+        val conn = (URL(urlString).openConnection() as HttpURLConnection).apply {
+            requestMethod = method
+            connectTimeout = CONNECT_TIMEOUT_MS
+            readTimeout = READ_TIMEOUT_MS
+            setRequestProperty("Accept", "application/json")
+            setRequestProperty("Authorization", "Bearer $idToken")
+        }
+        return try {
             conn.code() to conn.readBody()
         } finally {
             conn.disconnect()

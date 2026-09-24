@@ -230,6 +230,24 @@ class MainActivity : AppCompatActivity() {
         goToTab(R.id.nav_landing)
     }
 
+    /**
+     * Show the Trash screen over the current tab, on the back stack so the system
+     * Back button (and the screen's own Back arrow) returns to My Apps.
+     */
+    fun showTrash() {
+        setBottomNavVisible(true, animate = false)
+        supportFragmentManager.beginTransaction()
+            .setReorderingAllowed(true)
+            .replace(R.id.fragmentContainer, TrashFragment())
+            .addToBackStack("trash")
+            .commit()
+    }
+
+    /** Pop the Trash screen (or any back-stack entry) and return to the tab below. */
+    fun goBackFromOverlay() {
+        supportFragmentManager.popBackStack()
+    }
+
     // ---- Drawer / settings ---------------------------------------------------
 
     private fun setupBackPress() {
@@ -237,6 +255,13 @@ class MainActivity : AppCompatActivity() {
             override fun handleOnBackPressed() {
                 if (binding.drawerLayout.isDrawerOpen(GravityCompat.START)) {
                     binding.drawerLayout.closeDrawer(GravityCompat.START)
+                    return
+                }
+
+                // An overlay screen (e.g. Trash) sits on the back stack: pop it
+                // and return to the tab beneath instead of the exit prompt.
+                if (supportFragmentManager.backStackEntryCount > 0) {
+                    supportFragmentManager.popBackStack()
                     return
                 }
 

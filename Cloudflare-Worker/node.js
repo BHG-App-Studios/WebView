@@ -108,6 +108,14 @@ export default {
           return jsonResponse({ error: signing.error }, 400, corsHeaders);
         }
 
+        // Persist an on-device-generated keystore into this user's per-package
+        // reuse store so future auto builds of the same package sign with it.
+        // Only when the app flags save_to_keystores AND signing is custom; the
+        // keystore stays scoped to {uid}/keystores/{package}.{jks,json}.
+        if (signing.signingMode === "custom" && body.save_to_keystores === true) {
+          await persistGeneratedKeystore(body, packageName, uid, env);
+        }
+
         // Customisation: every AppConfig.kt constant
         const resolved = resolveOptions(body);
         if (resolved.error) {
@@ -960,6 +968,36 @@ function normalizeVersion(rawCode, rawName) {
  *
  * @returns {{buildType, outputs, signingMode}|{error}}
  */
+/**
+ * Saves an app-generated keystore into the caller's per-package reuse store:
+ * {uid}/keystores/{package}.jks (bytes) + {uid}/keystores/{package}.json
+ * (storePassword/keyAlias/keyPassword). This is the same layout the auto-mode
+ * reuse path reads, so a later "auto" build of the package picks up this key.
+ * Best-effort: a failure here never blocks the build (the keystore still
+ * travels with this build via the custom-signing bundle).
+ */
+async function persistGeneratedKeystore(body, packageName, uid, env) {
+  try {
+    const ks = validateCustomKeystore(body);
+    if (ks.error) return;
+    const pkg = normalizePackageName(packageName) || packageName;
+    if (!pkg) return;
+    const clean = ks.keystoreB64.replace(/[
+]/g, "");
+    const bytes = Uint8Array.from(atob(clean), (c) => c.charCodeAt(0));
+    await env.BUCKET.put(`${uid}/keystores/${pkg}.jks`, bytes, {
+      httpMetadata: { contentType: "application/octet-stream" }
+    });
+    await env.BUCKET.put(`${uid}/keystores/${pkg}.json`, JSON.stringify({
+      storePassword: ks.storePassword,
+      keyAlias: ks.keyAlias,
+      keyPassword: ks.keyPassword
+    }), { httpMetadata: { contentType: "application/json" } });
+  } catch (e) {
+    console.log(`persistGeneratedKeystore failed: ${e.message}`);
+  }
+}
+
 async function resolveSigning(body, buildId, packageName, uid, env) {
   // Build type ----------------------------------------------------------
   const buildType = String(body.build_type || "debug").trim().toLowerCase();

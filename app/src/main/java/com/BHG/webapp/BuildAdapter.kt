@@ -74,7 +74,8 @@ class BuildAdapter(
         b.itemDownloadAab.visibility = if (showAab) android.view.View.VISIBLE else android.view.View.GONE
         b.itemDownloadAab.setOnClickListener { if (showAab) onDownloadAab(item) }
 
-        // Keystore download — shown only for auto-signed builds with a stored key.
+        // Keystore download — shown for any build whose signing key was stored
+        // (debug or release, auto-generated or user-uploaded).
         val showKeystore = ready && item.keystoreAvailable && item.keystoreDownloadUrl.isNotEmpty()
         b.itemDownloadKeystore.visibility = if (showKeystore) android.view.View.VISIBLE else android.view.View.GONE
         b.itemDownloadKeystore.setOnClickListener { if (showKeystore) onDownloadKeystore(item) }

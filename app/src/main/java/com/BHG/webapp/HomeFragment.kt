@@ -81,6 +81,9 @@ class HomeFragment : Fragment() {
     /** Base64 of the user-picked custom keystore, and its display name. */
     private var customKeystoreB64: String? = null
     private var customKeystoreName: String? = null
+    // True only when the current keystore was generated on-device (KeystoreCreateSheet),
+    // so the build can ask the Worker to persist it to {uid}/keystores/{package}.
+    private var customKeystoreGenerated = false
 
     /** The URL the app name + package fields were last auto-derived from. */
     private var namesDerivedForUrl: String? = null
@@ -413,6 +416,7 @@ class HomeFragment : Fragment() {
 
         customKeystoreB64 = b64
         customKeystoreName = "$alias.p12"
+        customKeystoreGenerated = true
         // Fill the credential fields so the existing validation + dispatch path
         // sends the passwords that match the generated keystore.
         b.storePwInput.setText(storePw)
@@ -432,12 +436,14 @@ class HomeFragment : Fragment() {
             if (bytes.isEmpty()) throw IllegalStateException("empty file")
             customKeystoreB64 = Base64.encodeToString(bytes, Base64.NO_WRAP)
             customKeystoreName = queryDisplayName(uri) ?: "keystore"
+            customKeystoreGenerated = false
             b.keystoreFileName.visibility = View.VISIBLE
             b.keystoreFileName.text = getString(R.string.keystore_selected, customKeystoreName)
         } catch (e: Exception) {
             Log.w(TAG, "keystore read failed: ${e.message}")
             customKeystoreB64 = null
             customKeystoreName = null
+            customKeystoreGenerated = false
             toast(R.string.keystore_read_failed)
         }
     }
@@ -446,6 +452,7 @@ class HomeFragment : Fragment() {
     private fun clearKeystoreSelection() {
         customKeystoreB64 = null
         customKeystoreName = null
+        customKeystoreGenerated = false
         stepSigningBinding?.keystoreFileName?.let {
             it.text = ""
             it.visibility = View.GONE
@@ -807,6 +814,10 @@ class HomeFragment : Fragment() {
             json.put("key_alias", stepSigningBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty())
             val keyPw = stepSigningBinding?.keyPwInput?.text?.toString().orEmpty()
             if (keyPw.isNotEmpty()) json.put("key_password", keyPw)
+            // Ask the Worker to save an on-device-generated keystore into the
+            // per-user reuse store ({uid}/keystores/{package}) so future auto
+            // builds of this package sign with the same key.
+            if (customKeystoreGenerated) json.put("save_to_keystores", true)
         }
         return json
     }

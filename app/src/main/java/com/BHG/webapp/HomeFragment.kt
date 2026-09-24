@@ -23,6 +23,7 @@ import com.BHG.webapp.databinding.FragmentHomeBinding
 import com.BHG.webapp.databinding.StepEntryBinding
 import com.BHG.webapp.databinding.StepFeaturesBinding
 import com.BHG.webapp.databinding.StepPermissionsBinding
+import com.BHG.webapp.databinding.StepSigningBinding
 import com.BHG.webapp.databinding.StepWebsiteBinding
 import com.google.android.material.materialswitch.MaterialSwitch
 import com.google.firebase.auth.FirebaseAuth
@@ -32,11 +33,12 @@ import com.google.firebase.firestore.FirebaseFirestore
 import org.json.JSONObject
 
 /**
- * The builder wizard — 3 steps on the Home tab.
+ * The builder wizard — 4 steps on the Home tab.
  *
- * Step 0: Website URL, App name, Package name
- * Step 1: Feature toggles
- * Step 2: Permission toggles + Build button
+ * Step 1: App name + package name
+ * Step 2: Feature toggles
+ * Step 3: Permission toggles
+ * Step 4: Build type / output / signing + Build button
  *
  * On Build: registers in Firestore, dispatches to the Worker, then navigates
  * to the Build tab (nav_home) where [BuildFragment] shows live progress.
@@ -52,6 +54,7 @@ class HomeFragment : Fragment() {
     private var stepWebsiteBinding: StepWebsiteBinding? = null
     private var stepFeaturesBinding: StepFeaturesBinding? = null
     private var stepPermissionsBinding: StepPermissionsBinding? = null
+    private var stepSigningBinding: StepSigningBinding? = null
 
     private var buttonAnimators: List<ValueAnimator>? = null
 
@@ -118,8 +121,9 @@ class HomeFragment : Fragment() {
     private val PAGE_ENTRY       = 0
     private val STEP_WEBSITE     = 1  // Step 1: app name + package
     private val STEP_FEATURES    = 2  // Step 2: features
-    private val STEP_PERMISSIONS = 3  // Step 3: permissions + build
-    private val TOTAL_STEPS      = 4
+    private val STEP_PERMISSIONS = 3  // Step 3: permissions
+    private val STEP_SIGNING     = 4  // Step 4: build type / signing + build
+    private val TOTAL_STEPS      = 5
 
     // =========================================================================
     //  Lifecycle
@@ -178,7 +182,7 @@ class HomeFragment : Fragment() {
         binding.wizardPager.adapter = adapter
         binding.wizardPager.isUserInputEnabled = false
         // Keep every page inflated so all step bindings are ready when Build fires.
-        binding.wizardPager.offscreenPageLimit  = 3
+        binding.wizardPager.offscreenPageLimit  = 4
 
 
 
@@ -220,14 +224,15 @@ class HomeFragment : Fragment() {
     private fun setupNextButton() {
         binding.btnNext.setOnClickListener {
             when (binding.wizardPager.currentItem) {
-                STEP_WEBSITE  -> onNextFromWebsite()
-                STEP_FEATURES -> goToStep(STEP_PERMISSIONS)
+                STEP_WEBSITE     -> onNextFromWebsite()
+                STEP_FEATURES    -> goToStep(STEP_PERMISSIONS)
+                STEP_PERMISSIONS -> goToStep(STEP_SIGNING)
             }
         }
     }
 
     // =========================================================================
-    //  Inner adapter — 3 steps only
+    //  Inner adapter — entry screen + 4 steps
     // =========================================================================
 
     inner class WizardPagerAdapter : RecyclerView.Adapter<WizardPagerAdapter.StepVH>() {
@@ -262,7 +267,6 @@ class HomeFragment : Fragment() {
                 STEP_WEBSITE -> {
                     val b = StepWebsiteBinding.inflate(inf, parent, false)
                     stepWebsiteBinding = b
-                    setupSigningControls(b)
                     // If the URL was already confirmed before this page existed,
                     // fill in the derived app name + package now.
                     if (confirmedUrl.isNotEmpty()) prefillNamesFromUrl()
@@ -278,6 +282,12 @@ class HomeFragment : Fragment() {
                     val b = StepPermissionsBinding.inflate(inf, parent, false)
                     stepPermissionsBinding = b
                     buildPermissionToggles(b)
+                    StepVH(b.root)
+                }
+                STEP_SIGNING -> {
+                    val b = StepSigningBinding.inflate(inf, parent, false)
+                    stepSigningBinding = b
+                    setupSigningControls(b)
                     b.buildButton.isEnabled = b.ownershipCheckbox.isChecked
                     b.ownershipCheckbox.setOnCheckedChangeListener { _, isChecked ->
                         b.buildButton.isEnabled = isChecked
@@ -319,7 +329,7 @@ class HomeFragment : Fragment() {
     //  Signing controls (build type / output / keystore)
     // =========================================================================
 
-    private fun setupSigningControls(b: StepWebsiteBinding) {
+    private fun setupSigningControls(b: StepSigningBinding) {
         // Defaults: debug + auto + apk.
         b.buildTypeToggle.check(b.buildTypeDebug.id)
         b.signingToggle.check(b.signingAuto.id)
@@ -365,7 +375,7 @@ class HomeFragment : Fragment() {
 
     /** Reads the picked keystore into base64 and shows its name. */
     private fun onKeystorePicked(uri: Uri) {
-        val b = stepWebsiteBinding ?: return
+        val b = stepSigningBinding ?: return
         try {
             val bytes = requireContext().contentResolver.openInputStream(uri)?.use { it.readBytes() }
                 ?: throw IllegalStateException("empty stream")
@@ -386,7 +396,7 @@ class HomeFragment : Fragment() {
     private fun clearKeystoreSelection() {
         customKeystoreB64 = null
         customKeystoreName = null
-        stepWebsiteBinding?.keystoreFileName?.let {
+        stepSigningBinding?.keystoreFileName?.let {
             it.text = ""
             it.visibility = View.GONE
         }
@@ -504,6 +514,7 @@ class HomeFragment : Fragment() {
             STEP_WEBSITE     -> "App Details"
             STEP_FEATURES    -> "App Features"
             STEP_PERMISSIONS -> "Permissions"
+            STEP_SIGNING     -> "Build & Signing"
             else             -> "WebCraft"
         }
     }
@@ -511,8 +522,8 @@ class HomeFragment : Fragment() {
     private fun updateNextButtonForStep(step: Int) {
         when (step) {
             // Entry has its own full-width "Start Building" button; the floating Next
-            // drives the two middle steps. Permissions has the Build button.
-            STEP_WEBSITE, STEP_FEATURES -> {
+            // drives the three middle steps. The signing step has the Build button.
+            STEP_WEBSITE, STEP_FEATURES, STEP_PERMISSIONS -> {
                 binding.btnNext.visibility = View.VISIBLE
                 binding.btnNext.text = "Next"
                 binding.btnNext.setIconResource(R.drawable.ic_arrow_forward)
@@ -585,25 +596,25 @@ class HomeFragment : Fragment() {
         }
 
         // Custom signing requires a keystore file + credentials. Validate before
-        // dispatch and send the user back to the details step if incomplete.
+        // dispatch and send the user back to the signing step if incomplete.
         if (signingMode == "custom") {
             if (customKeystoreB64 == null) {
                 toast(R.string.keystore_required)
-                goToStep(STEP_WEBSITE)
+                goToStep(STEP_SIGNING)
                 return
             }
-            val storePw = stepWebsiteBinding?.storePwInput?.text?.toString().orEmpty()
-            val keyAlias = stepWebsiteBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty()
+            val storePw = stepSigningBinding?.storePwInput?.text?.toString().orEmpty()
+            val keyAlias = stepSigningBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty()
             if (storePw.isEmpty() || keyAlias.isEmpty()) {
                 toast(R.string.keystore_fields_required)
-                goToStep(STEP_WEBSITE)
+                goToStep(STEP_SIGNING)
                 return
             }
         }
 
         val user = auth?.currentUser ?: return
         buildDispatching = true
-        stepPermissionsBinding?.buildButton?.isEnabled = false
+        stepSigningBinding?.buildButton?.isEnabled = false
 
         val buildId     = newBuildId()
         val downloadUrl = "${BuildApi.BASE_URL}/download/$buildId.apk"
@@ -701,9 +712,9 @@ class HomeFragment : Fragment() {
             // Keystore bytes + passwords travel to the Worker over HTTPS only;
             // they are never written to Firestore.
             json.put("keystore_b64", customKeystoreB64)
-            json.put("store_password", stepWebsiteBinding?.storePwInput?.text?.toString().orEmpty())
-            json.put("key_alias", stepWebsiteBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty())
-            val keyPw = stepWebsiteBinding?.keyPwInput?.text?.toString().orEmpty()
+            json.put("store_password", stepSigningBinding?.storePwInput?.text?.toString().orEmpty())
+            json.put("key_alias", stepSigningBinding?.keyAliasInput?.text?.toString()?.trim().orEmpty())
+            val keyPw = stepSigningBinding?.keyPwInput?.text?.toString().orEmpty()
             if (keyPw.isNotEmpty()) json.put("key_password", keyPw)
         }
         return json
@@ -718,7 +729,7 @@ class HomeFragment : Fragment() {
         buildDispatching = false
         confirmedUrl = ""
         namesDerivedForUrl = null
-        stepPermissionsBinding?.let { b ->
+        stepSigningBinding?.let { b ->
             b.ownershipCheckbox.isChecked = false
             b.buildButton.isEnabled = false
         }
@@ -729,7 +740,7 @@ class HomeFragment : Fragment() {
         // Reset signing selections back to the defaults for the next build.
         buildType = "debug"; signingMode = "auto"; outputFormat = "apk"
         clearKeystoreSelection()
-        stepWebsiteBinding?.let { b ->
+        stepSigningBinding?.let { b ->
             b.buildTypeToggle.check(b.buildTypeDebug.id)
             b.signingToggle.check(b.signingAuto.id)
             b.outputToggle.check(b.outputApk.id)
@@ -743,7 +754,7 @@ class HomeFragment : Fragment() {
 
     private fun resetBuildButton() {
         buildDispatching = false
-        stepPermissionsBinding?.let { b ->
+        stepSigningBinding?.let { b ->
             b.buildButton.isEnabled = b.ownershipCheckbox.isChecked
         }
     }
@@ -841,6 +852,7 @@ class HomeFragment : Fragment() {
         stepWebsiteBinding     = null
         stepFeaturesBinding    = null
         stepPermissionsBinding = null
+        stepSigningBinding     = null
         _binding = null
         super.onDestroyView()
     }

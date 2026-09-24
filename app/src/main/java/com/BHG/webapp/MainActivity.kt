@@ -41,6 +41,13 @@ class MainActivity : AppCompatActivity() {
     private var firestore: FirebaseFirestore? = null
 
     private var currentTab = 0
+
+    /**
+     * When the user taps "Update" on a saved app, its details are stashed here
+     * and the wizard tab is opened; HomeFragment consumes this once to pre-fill
+     * the URL, package and a bumped version so the next build updates that app.
+     */
+    var pendingUpdatePrefill: BuildPrefill? = null
     private var backPressedTime: Long = 0
     private var navVisible = true
 
@@ -217,6 +224,12 @@ class MainActivity : AppCompatActivity() {
         syncNavSelection()
     }
 
+    /** Open the wizard pre-filled to build an update of an existing app. */
+    fun startAppUpdate(prefill: BuildPrefill) {
+        pendingUpdatePrefill = prefill
+        goToTab(R.id.nav_landing)
+    }
+
     // ---- Drawer / settings ---------------------------------------------------
 
     private fun setupBackPress() {
@@ -337,8 +350,17 @@ class MainActivity : AppCompatActivity() {
 
     private companion object {
         private const val TAG = "MainActivity"
+
         private const val KEY_TAB = "current_tab"
         private const val PRIVACY_URL = "https://bhg-app-studios.pages.dev/app-privacy.html?app=website-to-app-builder"
         private const val TERMS_URL = "https://bhg-app-studios.pages.dev/app-terms.html?app=website-to-app-builder"
     }
 }
+
+/** Pre-fill data carried from "My Apps → Update" into the build wizard. */
+data class BuildPrefill(
+    val url: String,
+    val packageName: String,
+    val versionName: String,
+    val versionCode: Long
+)

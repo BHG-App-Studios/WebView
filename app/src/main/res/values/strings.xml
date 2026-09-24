@@ -93,6 +93,23 @@
     <string name="keystore_selected">Selected: %1$s</string>
     <string name="download_keystore">Download keystore</string>
     <string name="download_aab">Download AAB</string>
+
+    <!-- My Apps item actions + info -->
+    <string name="action_info">Info</string>
+    <string name="action_keystore">Keystore</string>
+    <string name="action_update">Update</string>
+    <string name="action_download">Download</string>
+    <string name="info_url">Website</string>
+    <string name="info_package">Package</string>
+    <string name="info_version">Version</string>
+    <string name="info_build_type">Build type</string>
+    <string name="info_signing">Signing</string>
+    <string name="info_output">Output</string>
+    <string name="info_size">App size</string>
+    <string name="info_created">Created</string>
+    <string name="info_features">Features</string>
+    <string name="info_permissions">Permissions</string>
+    <string name="update_prefilled">Update started — review the details and build a new version.</string>
     <string name="section_features">Features</string>
     <string name="section_permissions">Permissions</string>
     <string name="section_permissions_hint">Turn off anything your app does not need. Internet access is always included.</string>

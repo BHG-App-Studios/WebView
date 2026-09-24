@@ -48,7 +48,8 @@ class HistoryFragment : Fragment() {
         adapter = BuildAdapter(
             onDownload = ::download,
             onDownloadAab = ::downloadAab,
-            onDownloadKeystore = ::downloadKeystore
+            onDownloadKeystore = ::downloadKeystore,
+            onUpdate = ::update
         )
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
@@ -75,17 +76,31 @@ class HistoryFragment : Fragment() {
                     Log.w(TAG, "History listener error: ${error.message}")
                     return@addSnapshotListener
                 }
-                val items = snapshot?.documents?.map { doc ->
+                val items = snapshot?.documents?.mapNotNull { doc ->
+                    val status = doc.getString("status") ?: "BUILDING"
+                    // While building, the app doesn't belong in "My Apps" yet.
+                    if (status == "BUILDING") return@mapNotNull null
                     BuildItem(
                         buildId = doc.getString("buildId") ?: doc.id,
                         appName = doc.getString("appName") ?: "",
                         url = doc.getString("url") ?: "",
-                        status = doc.getString("status") ?: "BUILDING",
+                        status = status,
                         downloadUrl = doc.getString("downloadUrl") ?: "",
                         createdAtMs = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
                         aabDownloadUrl = doc.getString("aabDownloadUrl") ?: "",
                         keystoreAvailable = doc.getBoolean("keystoreAvailable") ?: false,
-                        keystoreDownloadUrl = doc.getString("keystoreDownloadUrl") ?: ""
+                        keystoreDownloadUrl = doc.getString("keystoreDownloadUrl") ?: "",
+                        packageName = doc.getString("packageName") ?: "",
+                        versionName = doc.getString("versionName") ?: "",
+                        versionCode = doc.getLong("versionCode") ?: 0L,
+                        buildType = doc.getString("buildType") ?: "",
+                        signingMode = doc.getString("signingMode") ?: "",
+                        sizeBytes = doc.getLong("sizeBytes") ?: 0L,
+                        outputs = (doc.get("outputs") as? List<*>)?.mapNotNull { it as? String } ?: emptyList(),
+                        options = (doc.get("options") as? Map<*, *>)?.entries
+                            ?.mapNotNull { (k, v) -> (k as? String)?.let { it to (v as? Boolean ?: false) } }
+                            ?.toMap() ?: emptyMap(),
+                        removePermissions = (doc.get("removePermissions") as? List<*>)?.mapNotNull { it as? String } ?: emptyList()
                     )
                 }.orEmpty()
 
@@ -161,6 +176,21 @@ class HistoryFragment : Fragment() {
                 Log.w(TAG, "Keystore token fetch failed: ${e.message}")
                 if (isAdded) Toast.makeText(requireContext(), R.string.error_generic, Toast.LENGTH_SHORT).show()
             }
+    }
+
+    /**
+     * Open the build wizard pre-filled for an update of this app: same URL and
+     * package, version code bumped by one so the next Play upload is accepted.
+     */
+    private fun update(item: BuildItem) {
+        (activity as? MainActivity)?.startAppUpdate(
+            BuildPrefill(
+                url = item.url,
+                packageName = item.packageName,
+                versionName = item.versionName.ifEmpty { "1.0" },
+                versionCode = (if (item.versionCode > 0) item.versionCode else 1L) + 1
+            )
+        )
     }
 
     private fun openInBrowser(uri: Uri) {

@@ -62,6 +62,9 @@ class HomeFragment : Fragment() {
     private var confirmedUrl: String = ""
     private var pinging = false
 
+    /** Pending "update this app" prefill (url/package/version), applied on Step 1. */
+    private var updatePrefill: BuildPrefill? = null
+
     // ── Firebase ──────────────────────────────────────────────────────────────
     private val auth: FirebaseAuth? by lazy { runCatching { FirebaseAuth.getInstance() }.getOrNull() }
     private val firestore: FirebaseFirestore? by lazy { runCatching { FirebaseFirestore.getInstance() }.getOrNull() }
@@ -151,6 +154,23 @@ class HomeFragment : Fragment() {
         setupTopBar()
         setupNextButton()
         setupBackPressHandler()
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // A "My Apps → Update" tap hands us a prefill via MainActivity. Consume it
+        // once: drop the app's URL into the entry field and start the wizard so
+        // Step 1 can override the package/version to match the app being updated.
+        val activity = activity as? MainActivity ?: return
+        val prefill = activity.pendingUpdatePrefill ?: return
+        activity.pendingUpdatePrefill = null
+        updatePrefill = prefill
+        binding.wizardPager.post {
+            if (_binding == null) return@post
+            binding.wizardPager.setCurrentItem(PAGE_ENTRY, false)
+            stepEntryBinding?.entryUrlInput?.setText(prefill.url)
+            onStartBuilding()
+        }
     }
 
     private fun setupBackPressHandler() {
@@ -428,6 +448,14 @@ class HomeFragment : Fragment() {
         // Sensible version defaults for a first build; the user can change them.
         if (b.versionNameInput.text.isNullOrBlank()) b.versionNameInput.setText(DEFAULT_VERSION_NAME)
         if (b.versionCodeInput.text.isNullOrBlank()) b.versionCodeInput.setText(DEFAULT_VERSION_CODE.toString())
+        // Updating an existing app: keep its package and carry the bumped version.
+        updatePrefill?.let { p ->
+            if (p.packageName.isNotEmpty()) b.packageInput.setText(p.packageName)
+            b.versionNameInput.setText(p.versionName)
+            b.versionCodeInput.setText(p.versionCode.toString())
+            updatePrefill = null
+            toast(R.string.update_prefilled)
+        }
         namesDerivedForUrl = confirmedUrl
     }
 

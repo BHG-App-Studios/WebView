@@ -83,8 +83,6 @@
     <string name="keystore_key_alias">Key alias</string>
     <string name="keystore_key_password">Key password</string>
     <string name="keystore_key_password_helper">Leave blank if it is the same as the store password.</string>
-    <string name="keystore_remember">Remember on this device</string>
-    <string name="keystore_remember_helper">Saved encrypted on this device only — never uploaded or stored on our servers.</string>
     <string name="keystore_required">Please choose a keystore file</string>
     <string name="keystore_fields_required">Enter the store password and key alias for your keystore</string>
     <string name="keystore_read_failed">Could not read the selected keystore file</string>

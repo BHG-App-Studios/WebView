@@ -15,8 +15,6 @@ googleid = "1.2.1"
 swiperefreshlayout = "1.2.0"
 viewpager2 = "1.1.0"
 
-securityCrypto = "1.1.0"
-
 junit = "4.13.2"
 junitVersion = "1.3.0"
 playServicesAds = "25.5.0"
@@ -54,9 +52,6 @@ play-services-ads = { module = "com.google.android.gms:play-services-ads", versi
 
 # Core library desugaring
 desugar_jdk_libs = { module = "com.android.tools:desugar_jdk_libs", version.ref = "desugar_jdk_libs" }
-
-# Encrypted on-device storage for the "remember keystore" option
-androidx-security-crypto = { module = "androidx.security:security-crypto", version.ref = "securityCrypto" }
 
 # Testing
 junit = { group = "junit", name = "junit", version.ref = "junit" }

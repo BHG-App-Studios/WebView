@@ -76,10 +76,6 @@ class HomeFragment : Fragment() {
     private var customKeystoreB64: String? = null
     private var customKeystoreName: String? = null
 
-    private val keystorePrefs: KeystorePrefs? by lazy {
-        runCatching { KeystorePrefs(requireContext()) }.getOrNull()
-    }
-
     /** SAF picker for the custom keystore file. */
     private lateinit var keystorePicker: ActivityResultLauncher<Array<String>>
 
@@ -352,7 +348,6 @@ class HomeFragment : Fragment() {
             b.signingHelper.setText(
                 if (custom) R.string.signing_custom_helper else R.string.signing_auto_helper
             )
-            if (custom) prefillRememberedCredentials(b)
         }
 
         b.pickKeystoreButton.setOnClickListener {
@@ -360,15 +355,6 @@ class HomeFragment : Fragment() {
             // validate on read.
             keystorePicker.launch(arrayOf("*/*"))
         }
-    }
-
-    /** If the user previously chose "remember", pre-fill the password fields. */
-    private fun prefillRememberedCredentials(b: StepWebsiteBinding) {
-        val creds = keystorePrefs?.load() ?: return
-        if (b.storePwInput.text.isNullOrEmpty()) b.storePwInput.setText(creds.storePassword)
-        if (b.keyAliasInput.text.isNullOrEmpty()) b.keyAliasInput.setText(creds.keyAlias)
-        if (b.keyPwInput.text.isNullOrEmpty()) b.keyPwInput.setText(creds.keyPassword)
-        b.rememberKeystoreCheckbox.isChecked = true
     }
 
     /** Reads the picked keystore into base64 and shows its name. */
@@ -387,6 +373,16 @@ class HomeFragment : Fragment() {
             customKeystoreB64 = null
             customKeystoreName = null
             toast(R.string.keystore_read_failed)
+        }
+    }
+
+    /** Clears the selected custom keystore and its on-screen file name. */
+    private fun clearKeystoreSelection() {
+        customKeystoreB64 = null
+        customKeystoreName = null
+        stepWebsiteBinding?.keystoreFileName?.let {
+            it.text = ""
+            it.visibility = View.GONE
         }
     }
 
@@ -487,6 +483,10 @@ class HomeFragment : Fragment() {
 
             if (reachable) {
                 confirmedUrl = url
+                // Every time a URL is confirmed we start a fresh build: never
+                // carry over a keystore picked for a previous attempt. Nothing
+                // about the last selection is stored.
+                clearKeystoreSelection()
                 goToStep(STEP_WEBSITE)
             } else {
                 entry.entryUrlLayout.error = getString(R.string.error_url_unreachable)
@@ -527,14 +527,6 @@ class HomeFragment : Fragment() {
                 toast(R.string.keystore_fields_required)
                 goToStep(STEP_WEBSITE)
                 return
-            }
-            // Persist or forget the credentials per the "remember" checkbox.
-            val remember = stepWebsiteBinding?.rememberKeystoreCheckbox?.isChecked == true
-            val keyPw = stepWebsiteBinding?.keyPwInput?.text?.toString().orEmpty().ifEmpty { storePw }
-            if (remember) {
-                keystorePrefs?.save(KeystorePrefs.Credentials(storePw, keyAlias, keyPw))
-            } else {
-                keystorePrefs?.clear()
             }
         }
 
@@ -664,7 +656,7 @@ class HomeFragment : Fragment() {
         stepWebsiteBinding?.packageInput?.text?.clear()
         // Reset signing selections back to the defaults for the next build.
         buildType = "debug"; signingMode = "auto"; outputFormat = "apk"
-        customKeystoreB64 = null; customKeystoreName = null
+        clearKeystoreSelection()
         stepWebsiteBinding?.let { b ->
             b.buildTypeToggle.check(b.buildTypeDebug.id)
             b.signingToggle.check(b.signingAuto.id)
@@ -673,7 +665,6 @@ class HomeFragment : Fragment() {
             b.customKeystoreSection.visibility = View.GONE
             b.keystoreFileName.visibility = View.GONE
             b.storePwInput.text?.clear(); b.keyAliasInput.text?.clear(); b.keyPwInput.text?.clear()
-            b.rememberKeystoreCheckbox.isChecked = false
         }
         (activity as? MainActivity)?.setBottomNavVisible(true, animate = false)
     }

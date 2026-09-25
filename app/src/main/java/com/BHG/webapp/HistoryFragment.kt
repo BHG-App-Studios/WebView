@@ -42,9 +42,12 @@ class HistoryFragment : Fragment() {
     // app to Trash can copy it without another read.
     private var latestItems: List<BuildItem> = emptyList()
     private var latestData: Map<String, Map<String, Any?>> = emptyMap()
-    // BuildIds the user just deleted: hidden from the list immediately, while the
-    // Firestore round-trip finishes in the background.
+    // BuildIds whose row is hidden right now — a delete in flight. Every callback
+    // below lands on the main thread (Firestore listener and task listeners), so
+    // these plain sets need no locking.
     private val pendingRemovals = mutableSetOf<String>()
+    // BuildIds with a delete already running, so a double tap can't fire it twice.
+    private val inFlight = mutableSetOf<String>()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -273,12 +276,13 @@ class HistoryFragment : Fragment() {
     private fun moveToTrash(item: BuildItem) {
         val user = auth?.currentUser ?: return
         val db = firestore ?: return
+        if (!inFlight.add(item.buildId)) return
 
         val raw = latestData[item.buildId]
         if (raw == null) {
             // Nothing cached to copy — the doc is already gone; let the listener
             // settle the list on its own.
-            pendingRemovals.remove(item.buildId)
+            inFlight.remove(item.buildId)
             render()
             return
         }
@@ -298,12 +302,16 @@ class HistoryFragment : Fragment() {
 
         // No success handling needed: the listener reports the result for us.
         trash.set(data)
-            .addOnSuccessListener { source.delete().addOnFailureListener { failTrashOp(item, it) } }
+            .addOnSuccessListener {
+                inFlight.remove(item.buildId)
+                source.delete().addOnFailureListener { failTrashOp(item, it) }
+            }
             .addOnFailureListener { failTrashOp(item, it) }
     }
 
     private fun failTrashOp(item: BuildItem, e: Exception) {
         Log.w(TAG, "Move to trash failed: ${e.message}", e)
+        inFlight.remove(item.buildId)
         pendingRemovals.remove(item.buildId)
         render()
         if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()

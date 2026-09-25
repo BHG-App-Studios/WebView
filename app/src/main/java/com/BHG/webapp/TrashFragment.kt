@@ -34,8 +34,16 @@ class TrashFragment : Fragment() {
     private lateinit var adapter: TrashAdapter
     private var listener: ListenerRegistration? = null
 
-    /** buildIds with a permanent-delete in flight, so we don't fire it twice. */
-    private val deleting = mutableSetOf<String>()
+    // Newest list the server sent, plus the raw doc data behind it, so a restore
+    // can write the app back to builds without another read.
+    private var latestItems: List<BuildItem> = emptyList()
+    private var latestData: Map<String, Map<String, Any?>> = emptyMap()
+    // BuildIds whose row is hidden right now — a restore or permanent delete in
+    // flight. Every callback below lands on the main thread (Firestore and
+    // BuildApi both post back there), so these plain sets need no locking.
+    private val pendingRemovals = mutableSetOf<String>()
+    // BuildIds with an op already running, so a double tap can't fire it twice.
+    private val inFlight = mutableSetOf<String>()
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -102,9 +110,27 @@ class TrashFragment : Fragment() {
                     )
                 }.orEmpty()
 
-                adapter.submitList(items)
-                showEmpty(items.isEmpty())
+                latestItems = items
+                latestData = snapshot?.documents?.associate { doc ->
+                    (doc.getString("buildId") ?: doc.id) to (doc.data ?: emptyMap<String, Any?>())
+                }.orEmpty()
+                // Anything the server no longer sends back is gone for good, so
+                // stop hiding it — the op has landed.
+                pendingRemovals.retainAll(items.map { it.buildId }.toSet())
+                render()
             }
+    }
+
+    /**
+     * Draws [latestItems] minus the rows with an op in flight, so Restore and
+     * Delete forever both take effect instantly and the listener catches up
+     * afterwards.
+     */
+    private fun render() {
+        if (_binding == null) return
+        val visible = latestItems.filter { it.buildId !in pendingRemovals }
+        adapter.submitList(visible)
+        showEmpty(visible.isEmpty())
     }
 
     private fun showEmpty(empty: Boolean) {
@@ -125,28 +151,52 @@ class TrashFragment : Fragment() {
             .show()
     }
 
+    /**
+     * Fire-and-forget restore: the row disappears at once and the write back to
+     * builds runs in the background — the listener drops it from trash when it
+     * lands. If it fails the row comes back and we say so.
+     */
     private fun restore(item: BuildItem) {
         val user = auth?.currentUser ?: return
         val db = firestore ?: return
-        val builds = db.collection("users").document(user.uid).collection("builds")
-        val trash = db.collection("users").document(user.uid).collection("trashApps")
+        if (!inFlight.add(item.buildId)) return
 
-        trash.document(item.buildId).get()
-            .addOnSuccessListener { snap ->
-                if (!isAdded) return@addOnSuccessListener
-                val data = HashMap(snap.data ?: emptyMap())
-                data.remove("trashedAt")
-                builds.document(item.buildId).set(data)
-                    .addOnSuccessListener {
-                        trash.document(item.buildId).delete()
-                            .addOnSuccessListener {
-                                if (isAdded) Toast.makeText(requireContext(), R.string.restored_from_trash, Toast.LENGTH_SHORT).show()
-                            }
-                            .addOnFailureListener { fail(it) }
-                    }
-                    .addOnFailureListener { fail(it) }
+        val raw = latestData[item.buildId]
+        if (raw == null) {
+            // Nothing cached to write back — the doc is already gone; let the
+            // listener settle the list on its own.
+            inFlight.remove(item.buildId)
+            render()
+            return
+        }
+
+        // Optimistic: drop the row now, don't wait for Firestore.
+        pendingRemovals.add(item.buildId)
+        render()
+        if (isAdded) Toast.makeText(requireContext(), R.string.restored_from_trash, Toast.LENGTH_SHORT).show()
+
+        val data = HashMap<String, Any?>(raw)
+        data.remove("trashedAt")
+        val builds = db.collection("users").document(user.uid)
+            .collection("builds").document(item.buildId)
+        val trash = db.collection("users").document(user.uid)
+            .collection("trashApps").document(item.buildId)
+
+        // No success handling needed: the listener reports the result for us.
+        builds.set(data)
+            .addOnSuccessListener {
+                inFlight.remove(item.buildId)
+                trash.delete().addOnFailureListener { failRestore(item, it) }
             }
-            .addOnFailureListener { fail(it) }
+            .addOnFailureListener { failRestore(item, it) }
+    }
+
+    private fun failRestore(item: BuildItem, e: Exception) {
+        Log.w(TAG, "Restore failed: ${e.message}", e)
+        inFlight.remove(item.buildId)
+        pendingRemovals.remove(item.buildId)
+        render()
+        if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
     }
 
     // ---- Permanent delete ----------------------------------------------------
@@ -165,23 +215,28 @@ class TrashFragment : Fragment() {
      * Full wipe: first ask the Worker to delete the app's Cloudflare files
      * (APK/AAB/keystore) using the owner's ID token, then remove the Firestore
      * doc from trashApps. Only when both are gone is the app truly deleted.
+     *
+     * The row is hidden straight away so the tap feels instant, but the wipe is
+     * irreversible — so any failure below puts the row back and reports it.
      */
     private fun deleteForever(item: BuildItem) {
-        if (!deleting.add(item.buildId)) return
+        if (!inFlight.add(item.buildId)) return
         val user = auth?.currentUser
         if (user == null) {
-            deleting.remove(item.buildId)
+            inFlight.remove(item.buildId)
             if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
             return
         }
+
+        pendingRemovals.add(item.buildId)
+        render()
         if (isAdded) Toast.makeText(requireContext(), R.string.deleting, Toast.LENGTH_SHORT).show()
 
         user.getIdToken(false)
             .addOnSuccessListener { result ->
                 val token = result.token
                 if (token.isNullOrEmpty()) {
-                    deleting.remove(item.buildId)
-                    if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
+                    failDelete(item, null)
                     return@addOnSuccessListener
                 }
                 BuildApi.deleteApp(
@@ -189,39 +244,39 @@ class TrashFragment : Fragment() {
                     idToken = token,
                     onSuccess = { deleteTrashDoc(item) },
                     onError = { msg ->
-                        deleting.remove(item.buildId)
                         Log.w(TAG, "Server delete failed: $msg")
-                        if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
+                        failDelete(item, null)
                     }
                 )
             }
-            .addOnFailureListener {
-                deleting.remove(item.buildId)
-                fail(it)
-            }
+            .addOnFailureListener { failDelete(item, it) }
     }
 
     private fun deleteTrashDoc(item: BuildItem) {
         val user = auth?.currentUser
         val db = firestore
         if (user == null || db == null) {
-            deleting.remove(item.buildId)
+            failDelete(item, null)
             return
         }
         db.collection("users").document(user.uid)
             .collection("trashApps").document(item.buildId).delete()
             .addOnSuccessListener {
-                deleting.remove(item.buildId)
+                inFlight.remove(item.buildId)
                 if (isAdded) Toast.makeText(requireContext(), R.string.deleted_forever, Toast.LENGTH_SHORT).show()
             }
-            .addOnFailureListener {
-                deleting.remove(item.buildId)
-                fail(it)
-            }
+            .addOnFailureListener { failDelete(item, it) }
     }
 
-    private fun fail(e: Exception) {
-        Log.w(TAG, "Trash op failed: ${e.message}")
+    /**
+     * Puts a hidden row back and reports the failure. [e] is null when the
+     * failure came from BuildApi, which only hands back a message.
+     */
+    private fun failDelete(item: BuildItem, e: Exception?) {
+        if (e != null) Log.w(TAG, "Trash op failed: ${e.message}", e)
+        inFlight.remove(item.buildId)
+        pendingRemovals.remove(item.buildId)
+        render()
         if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
     }
 

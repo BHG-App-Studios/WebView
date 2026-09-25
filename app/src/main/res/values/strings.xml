@@ -198,6 +198,8 @@
     <string name="history_empty_subtitle">Your generated apps will appear here once you build one.</string>
     <string name="status_building">Building</string>
     <string name="status_ready">Ready</string>
+    <string name="status_testing">Testing</string>
+    <string name="status_production">Production</string>
     <string name="status_failed">Failed</string>
 
     <!-- Active builds -->

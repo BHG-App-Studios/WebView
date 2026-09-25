@@ -9,7 +9,6 @@ import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
 import com.BHG.webapp.databinding.ItemBuildBinding
 import com.google.android.material.button.MaterialButton
-import java.util.Date
 
 /** One build row in the History ("My Apps") list. */
 data class BuildItem(
@@ -68,11 +67,18 @@ class BuildAdapter(
 
         b.itemAppName.text = item.appName.ifEmpty { ctx.getString(R.string.app_display_name) }
         b.itemUrl.text = item.url
-        b.itemDate.text = if (item.createdAtMs > 0) BuildInfoPanel.DATE_FMT.format(Date(item.createdAtMs)) else ""
 
-        val (labelRes, colorAttr) = when (item.status) {
-            "READY" -> R.string.status_ready to R.color.success
-            "FAILED", "REJECTED" -> R.string.status_failed to R.color.error
+        val hasApk = item.downloadUrl.isNotEmpty()
+        val hasAab = item.aabDownloadUrl.isNotEmpty()
+
+        // Status pill. For a ready build the label reflects what it produces:
+        // an AAB is Play-publishable (Production); a release APK is shareable
+        // (Ready); a debug APK is test-only (Testing).
+        val (labelRes, colorAttr) = when {
+            item.status == "READY" && hasAab -> R.string.status_production to R.color.success
+            item.status == "READY" && item.buildType == "release" -> R.string.status_ready to R.color.success
+            item.status == "READY" -> R.string.status_testing to R.color.text_secondary
+            item.status == "FAILED" || item.status == "REJECTED" -> R.string.status_failed to R.color.error
             else -> R.string.status_building to R.color.text_secondary
         }
         b.itemStatus.text = ctx.getString(labelRes)
@@ -86,9 +92,7 @@ class BuildAdapter(
         b.itemSize.visibility = if (showSize) View.VISIBLE else View.GONE
         if (showSize) b.itemSize.text = BuildInfoPanel.formatSize(item.sizeBytes)
 
-        // Download — APK when present; AAB-only release falls back to the AAB.
-        val hasApk = item.downloadUrl.isNotEmpty()
-        val hasAab = item.aabDownloadUrl.isNotEmpty()
+        // Download — opens the APK/AAB options sheet.
         val canDownload = ready && (hasApk || hasAab)
         setAction(b.itemDownload, canDownload) { onDownloadOptions(item) }
 

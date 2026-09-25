@@ -2,6 +2,7 @@ package com.BHG.webapp
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.BitmapFactory
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
 import android.net.Uri
@@ -31,6 +32,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import org.json.JSONObject
+import java.io.File
 
 /**
  * The builder wizard — 4 steps on the Home tab.
@@ -85,9 +87,11 @@ class HomeFragment : Fragment() {
     // so the build can ask the Worker to persist it to {uid}/keystores/{package}.
     private var customKeystoreGenerated = false
 
-    // Custom app logo built on-device by LogoCreateFragment. The generated res/
-    // icon ZIP is cached to disk; its bytes are base64'd into the build request
-    // at dispatch time so the runner can drop them into the project.
+    // Custom app logo built on-device by LogoCreateFragment and persisted by
+    // LogoStore under the confirmed URL, so entering the same site again — even
+    // after a restart — brings its logo back. The ZIP's bytes are base64'd into
+    // the build request at dispatch time so the runner can drop them into the
+    // project.
     private var logoZipPath: String? = null
     private var logoPreviewPath: String? = null
 
@@ -307,8 +311,12 @@ class HomeFragment : Fragment() {
                     val b = StepWebsiteBinding.inflate(inf, parent, false)
                     stepWebsiteBinding = b
                     // If the URL was already confirmed before this page existed,
-                    // fill in the derived app name + package now.
-                    if (confirmedUrl.isNotEmpty()) prefillNamesFromUrl()
+                    // fill in the derived app name + package — and the logo saved
+                    // for that site — now.
+                    if (confirmedUrl.isNotEmpty()) {
+                        prefillNamesFromUrl()
+                        restoreLogoForUrl()
+                    }
                     b.logoCreateButton.setOnClickListener { openLogoCreator() }
                     updateLogoCard(b)
                     StepVH(b.root)
@@ -518,38 +526,59 @@ class HomeFragment : Fragment() {
         if (bundle.getBoolean(LogoCreateFragment.ARG_REMOVED, false)) {
             clearLogoSelection()
         } else {
-            // Adopt the freshly created ZIP + preview for this build only. Nothing
-            // is written to disk, so the selection lives just for this session.
+            // Paths into LogoStore, so the logo this build uses is the same one
+            // that comes back for this URL on the next launch.
             logoZipPath = bundle.getString(LogoCreateFragment.ARG_ZIP_PATH)
             logoPreviewPath = bundle.getString(LogoCreateFragment.ARG_PREVIEW_PATH)
         }
         stepWebsiteBinding?.let { updateLogoCard(it) }
     }
 
-    /** Clears the current logo selection. */
+    /**
+     * Adopts the logo stored for [confirmedUrl]. A logo belongs to the site it
+     * was designed for, so a different URL starts with none rather than
+     * inheriting the previous one. Called when a URL is confirmed and when
+     * Step 1 is (re)created, so the card always matches the confirmed site.
+     */
+    private fun restoreLogoForUrl() {
+        val saved = LogoStore.committed(requireContext(), confirmedUrl)
+        logoZipPath = saved?.zipPath
+        logoPreviewPath = saved?.previewPath
+    }
+
+    /** Clears the in-memory logo selection; what LogoStore holds is left alone. */
     private fun clearLogoSelection() {
         logoZipPath = null
         logoPreviewPath = null
     }
 
-    /** Reflects whether a custom logo is set on the Step 1 card. */
+    /**
+     * Reflects whether a custom logo is set on the Step 1 card. The stored ZIP is
+     * what a build actually consumes, so it drives the card's state; the preview
+     * is decoration and may fail to decode without invalidating the logo.
+     */
     private fun updateLogoCard(b: StepWebsiteBinding) {
-        val hasLogo = logoZipPath != null
-        if (hasLogo) {
-            val preview = logoPreviewPath?.let { android.graphics.BitmapFactory.decodeFile(it) }
-            if (preview != null) {
-                b.logoPreview.setImageBitmap(preview)
-                b.logoPreview.visibility = View.VISIBLE
-                b.logoIcon.visibility = View.GONE
-                b.logoIconBg.visibility = View.GONE
-            }
-            b.logoSubtitle.setText(R.string.logo_added)
-            b.logoCreateButton.setText(R.string.logo_edit)
+        val hasLogo = logoZipPath?.let { File(it).isFile } == true
+        val preview = if (hasLogo) {
+            logoPreviewPath?.let { runCatching { BitmapFactory.decodeFile(it) }.getOrNull() }
+        } else null
+
+        if (preview != null) {
+            b.logoPreview.setImageBitmap(preview)
+            b.logoPreview.visibility = View.VISIBLE
+            b.logoIcon.visibility = View.GONE
+            b.logoIconBg.visibility = View.GONE
         } else {
             b.logoPreview.setImageDrawable(null)
             b.logoPreview.visibility = View.GONE
             b.logoIcon.visibility = View.VISIBLE
             b.logoIconBg.visibility = View.VISIBLE
+        }
+
+        if (hasLogo) {
+            b.logoSubtitle.setText(R.string.logo_added)
+            b.logoCreateButton.setText(R.string.logo_edit)
+        } else {
             b.logoSubtitle.setText(R.string.logo_card_subtitle)
             b.logoCreateButton.setText(R.string.logo_create)
         }
@@ -753,6 +782,11 @@ class HomeFragment : Fragment() {
                 // is never blank. The user can edit or clear them (a cleared
                 // field is auto-filled server-side at build time).
                 prefillNamesFromUrl()
+                // Bring back the logo stored for this site, if it has one: a logo
+                // belongs to the URL it was designed for, so a different URL
+                // starts without one.
+                restoreLogoForUrl()
+                stepWebsiteBinding?.let { updateLogoCard(it) }
                 goToStep(STEP_WEBSITE)
             } else {
                 entry.entryUrlLayout.error = getString(R.string.error_url_unreachable)

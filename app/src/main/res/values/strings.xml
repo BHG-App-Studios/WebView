@@ -277,4 +277,5 @@
     <string name="logo_close">Close</string>
     <string name="logo_reset">Reset to default</string>
     <string name="logo_reset_done">Reset to default</string>
+    <string name="logo_save_failed">Could not save the logo. Please try again.</string>
 </resources>

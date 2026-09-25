@@ -1,6 +1,5 @@
 package com.BHG.webapp
 
-import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
 import android.net.Uri
@@ -9,6 +8,7 @@ import android.os.Handler
 import android.os.Looper
 import android.text.Editable
 import android.text.TextWatcher
+import android.util.Log
 import android.util.TypedValue
 import android.view.LayoutInflater
 import android.view.View
@@ -20,7 +20,7 @@ import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.os.bundleOf
 import androidx.fragment.app.DialogFragment
 import com.BHG.webapp.databinding.FragmentLogoCreateBinding
-import java.io.File
+import java.io.ByteArrayOutputStream
 
 /**
  * Full-screen logo creator. Collects a foreground image + size and a background
@@ -29,9 +29,18 @@ import java.io.File
  * The monochrome (themed) layer is generated automatically from the foreground;
  * there is deliberately no monochrome control in the UI.
  *
- * Returns to [HomeFragment] through the Fragment Result API: paths to the
- * generated ZIP and a preview PNG in the cache dir (bytes are read at build
- * time to keep the result bundle small), or a "removed" flag.
+ * The design is tied to the site it was made for ([ARG_URL]) and persisted by
+ * [LogoStore], so it survives leaving the sheet and restarting the app:
+ *
+ *  - opening the sheet restores the design saved for that URL, falling back to
+ *    the most recently created one;
+ *  - "Use this logo" stores the generated ZIP + preview alongside the design and
+ *    hands [HomeFragment] the stored paths through the Fragment Result API;
+ *  - closing the sheet mid-edit keeps the tweaked design (only when it actually
+ *    differs from what was on screen at open, so a plain open/close writes
+ *    nothing);
+ *  - "Remove logo" deletes both the design and the generated icons, so a
+ *    removed logo does not come back after a restart.
  */
 class LogoCreateFragment : DialogFragment() {
 
@@ -47,18 +56,42 @@ class LogoCreateFragment : DialogFragment() {
     private var bgResize = 100
     private var busy = false
 
+    /** Design as it stood when the sheet opened — the diff base for the exit save. */
+    private var baseline: LogoStore.Draft? = null
+
+    /** Set once the user picks an image, so a slow restore can't overwrite that pick. */
+    private var userPicked = false
+
+    /** True while [applyDraft] writes the widgets, to collapse the re-renders. */
+    private var applying = false
+
+    /** Set when the design was already stored or deliberately removed. */
+    private var skipExitSave = false
+
     private lateinit var pickFg: ActivityResultLauncher<String>
     private lateinit var pickBg: ActivityResultLauncher<String>
+
+    /** Site this logo belongs to; the key [LogoStore] persists it under. */
+    private val logoUrl: String get() = arguments?.getString(ARG_URL).orEmpty()
 
     override fun getTheme(): Int = R.style.Theme_WebsiteAppBuilder_FullScreenDialog
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         pickFg = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            if (uri != null) { fg = decode(uri); onFgPicked(); refresh() }
+            if (uri != null && _b != null) {
+                fg = decode(uri)
+                userPicked = true
+                onFgPicked()
+                refresh()
+            }
         }
         pickBg = registerForActivityResult(ActivityResultContracts.GetContent()) { uri ->
-            if (uri != null) { bgImg = decode(uri); refresh() }
+            if (uri != null && _b != null) {
+                bgImg = decode(uri)
+                userPicked = true
+                refresh()
+            }
         }
     }
 
@@ -71,7 +104,7 @@ class LogoCreateFragment : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
-        loadDefaultImages()
+        loadInitialDesign()
         b.logoClose.setOnClickListener { if (!busy) dismiss() }
         b.logoReset.setOnClickListener { if (!busy) resetToDefaults() }
         b.fgPickButton.setOnClickListener { pickFg.launch("image/*") }
@@ -143,6 +176,57 @@ class LogoCreateFragment : DialogFragment() {
         }
     }
 
+    /**
+     * Seeds the sheet: the bundled defaults first, so the preview is never blank,
+     * then — a frame later and off the main thread — the design stored for this
+     * URL (or the most recent one), which replaces them. Best-effort throughout:
+     * anything unreadable simply leaves the defaults in place.
+     */
+    private fun loadInitialDesign() {
+        loadDefaultImages()
+        baseline = currentDraft()
+
+        val appContext = requireContext().applicationContext
+        val url = logoUrl
+        Thread {
+            val draft = runCatching { LogoStore.loadDraft(appContext, url) }.getOrNull()
+            if (draft != null) {
+                Handler(Looper.getMainLooper()).post {
+                    // The sheet may already be gone, or the user may have picked
+                    // an image while the read was in flight — never overwrite either.
+                    if (_b == null || userPicked) return@post
+                    applyDraft(draft)
+                    baseline = currentDraft()
+                    refresh()
+                }
+            }
+        }.start()
+    }
+
+    /** Writes a stored design into the state and the controls in a single pass. */
+    private fun applyDraft(d: LogoStore.Draft) {
+        applying = true
+        fg = d.fg
+        bgImg = d.bgImage
+        bgIsColor = d.bgIsColor
+        bgColor = d.bgColor
+        fgResize = d.fgResize
+        bgResize = d.bgResize
+        fgRotation = d.fgRotation
+
+        // A stored design always has a foreground, and a background image too if
+        // one was used, so both pickers read as "already chosen".
+        b.fgPickButton.setText(R.string.logo_change_image)
+        if (d.bgImage != null) b.bgPickButton.setText(R.string.logo_change_image)
+        b.fgSizeSlider.value = fgResize.toFloat(); b.fgSizeValue.text = pct(fgResize)
+        b.bgSizeSlider.value = bgResize.toFloat(); b.bgSizeValue.text = pct(bgResize)
+        b.fgRotationSlider.value = fgRotation.toFloat(); b.fgRotationValue.text = deg(fgRotation)
+        b.bgTypeToggle.check(if (bgIsColor) b.bgTypeColor.id else b.bgTypeImage.id)
+        b.bgColorHexInput.setText(hex(bgColor))
+        applyBgType()
+        applying = false
+    }
+
     private fun applyBgType() {
         b.bgColorRow.visibility = if (bgIsColor) View.VISIBLE else View.GONE
         b.bgImageRow.visibility = if (bgIsColor) View.GONE else View.VISIBLE
@@ -192,22 +276,33 @@ class LogoCreateFragment : DialogFragment() {
 
     private fun hex(color: Int): String = String.format("#%06X", 0xFFFFFF and color)
 
-    /** Builds the current config, or null if required inputs are missing. */
-    private fun currentConfig(): IconRenderer.Config? {
+    /**
+     * The design currently on screen, or null when it is incomplete — no
+     * foreground, or an image background with no image. Values always sit inside
+     * the slider ranges, since [LogoStore] clamps them on the way out.
+     */
+    private fun currentDraft(): LogoStore.Draft? {
         val f = fg ?: return null
         if (!bgIsColor && bgImg == null) return null
+        return LogoStore.Draft(f, bgImg, bgIsColor, bgColor, fgResize, bgResize, fgRotation)
+    }
+
+    /** Builds the current config for [IconRenderer], or null if inputs are missing. */
+    private fun currentConfig(): IconRenderer.Config? {
+        val d = currentDraft() ?: return null
         return IconRenderer.Config(
-            foreground = f,
-            fgResizePct = fgResize,
-            bgIsColor = bgIsColor,
-            bgColor = bgColor,
-            bgImage = bgImg,
-            bgResizePct = bgResize,
-            fgRotationDeg = fgRotation
+            foreground = d.fg,
+            fgResizePct = d.fgResize,
+            bgIsColor = d.bgIsColor,
+            bgColor = d.bgColor,
+            bgImage = d.bgImage,
+            bgResizePct = d.bgResize,
+            fgRotationDeg = d.fgRotation
         )
     }
 
     private fun refresh() {
+        if (applying) return   // a bulk restore re-renders once, at the end
         b.bgColorSwatch.setBackgroundColor(bgColor)
 
         // Separate layer previews so each choice is visible on its own.
@@ -298,7 +393,8 @@ class LogoCreateFragment : DialogFragment() {
     }
 
     private fun decode(uri: Uri): Bitmap? = try {
-        requireContext().contentResolver.openInputStream(uri)?.use { input ->
+        val ctx = context ?: return null
+        ctx.contentResolver.openInputStream(uri)?.use { input ->
             val bytes = input.readBytes()
             val bounds = android.graphics.BitmapFactory.Options().apply { inJustDecodeBounds = true }
             android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, bounds)
@@ -308,59 +404,118 @@ class LogoCreateFragment : DialogFragment() {
             val opts = android.graphics.BitmapFactory.Options().apply { inSampleSize = sample }
             android.graphics.BitmapFactory.decodeByteArray(bytes, 0, bytes.size, opts)
         }
-    } catch (e: Exception) {
-        Toast.makeText(requireContext(), R.string.logo_failed, Toast.LENGTH_SHORT).show()
+    } catch (t: Throwable) {
+        // A picker can hand back anything, including a file too large to decode.
+        Log.w(TAG, "image decode failed", t)
+        toast(R.string.logo_failed)
         null
+    }
+
+    /** Toast that survives the view going away between the pick and the result. */
+    private fun toast(resId: Int) {
+        val ctx = context ?: return
+        Toast.makeText(ctx, resId, Toast.LENGTH_SHORT).show()
     }
 
     private fun onUse() {
         if (busy) return
-        if (fg == null) { Toast.makeText(requireContext(), R.string.logo_need_foreground, Toast.LENGTH_SHORT).show(); return }
-        if (!bgIsColor && bgImg == null) { Toast.makeText(requireContext(), R.string.logo_need_background, Toast.LENGTH_SHORT).show(); return }
+        val draft = currentDraft()
+        if (draft == null) {
+            Toast.makeText(
+                requireContext(),
+                if (fg == null) R.string.logo_need_foreground else R.string.logo_need_background,
+                Toast.LENGTH_SHORT
+            ).show()
+            return
+        }
         val cfg = currentConfig() ?: return
 
         setBusy(true)
-        val cacheDir = requireContext().cacheDir
+        val appContext = requireContext().applicationContext
+        val url = logoUrl
         val main = Handler(Looper.getMainLooper())
         Thread {
             try {
                 val zip = IconRenderer.buildZip(cfg)
-                val zipFile = File(cacheDir, "logo_icons.zip")
-                zipFile.writeBytes(zip)
-
-                val previewFile = File(cacheDir, "logo_preview.png")
-                previewFile.outputStream().use { os ->
-                    IconRenderer.renderLegacy(cfg, 192, "square")
+                val preview = ByteArrayOutputStream().use { os ->
+                    IconRenderer.renderLegacy(cfg, PREVIEW_PX, "square")
                         .compress(Bitmap.CompressFormat.PNG, 100, os)
+                    os.toByteArray()
                 }
 
-                // Hand HomeFragment the freshly built files for this build. Nothing
-                // is persisted — the selection lives only for the current session.
+                // Store the icon set and the design that produced it. Nothing is
+                // written to the cache: the paths handed back live in filesDir, so
+                // both this build and the next launch read the same logo.
+                val saved = LogoStore.commit(appContext, url, draft, zip, preview)
+
                 main.post {
                     if (_b == null) return@post
+                    if (saved == null) {
+                        setBusy(false)
+                        Toast.makeText(
+                            context ?: return@post, R.string.logo_save_failed, Toast.LENGTH_SHORT
+                        ).show()
+                        return@post
+                    }
+                    skipExitSave = true   // the commit already stored this design
                     parentFragmentManager.setFragmentResult(
                         RESULT_KEY,
                         bundleOf(
-                            ARG_ZIP_PATH to zipFile.absolutePath,
-                            ARG_PREVIEW_PATH to previewFile.absolutePath
+                            ARG_ZIP_PATH to saved.zipPath,
+                            ARG_PREVIEW_PATH to saved.previewPath
                         )
                     )
                     dismiss()
                 }
-            } catch (e: Exception) {
+            } catch (t: Throwable) {
+                // Includes OutOfMemoryError from the icon bitmaps: a failed logo
+                // must never take the app down with it.
+                Log.w(TAG, "logo build failed", t)
                 main.post {
                     if (_b == null) return@post
                     setBusy(false)
-                    Toast.makeText(requireContext(), R.string.logo_failed, Toast.LENGTH_SHORT).show()
+                    Toast.makeText(
+                        context ?: return@post, R.string.logo_failed, Toast.LENGTH_SHORT
+                    ).show()
                 }
             }
         }.start()
     }
 
     private fun sendRemoved() {
+        // Removal has to stick, or the logo would reappear on the next launch.
+        skipExitSave = true
+        val appContext = context?.applicationContext
+        if (appContext != null) {
+            val url = logoUrl
+            Thread { runCatching { LogoStore.clear(appContext, url) } }.start()
+        }
         parentFragmentManager.setFragmentResult(RESULT_KEY, bundleOf(ARG_REMOVED to true))
         dismiss()
     }
+
+    /**
+     * Keeps the design the user left behind, so reopening the creator for this
+     * site restores it. Skipped when the design is unchanged (a plain open/close
+     * writes nothing) and when it was already committed or removed.
+     */
+    private fun saveDraftOnExit() {
+        if (skipExitSave) return
+        val appContext = context?.applicationContext ?: return
+        val base = baseline ?: return
+        val draft = currentDraft() ?: return
+        if (!differs(draft, base)) return
+
+        val url = logoUrl
+        Thread { runCatching { LogoStore.saveDraft(appContext, url, draft) } }.start()
+    }
+
+    /** Field-by-field comparison; the images are compared by identity. */
+    private fun differs(draft: LogoStore.Draft, base: LogoStore.Draft): Boolean =
+        draft.fg !== base.fg || draft.bgImage !== base.bgImage ||
+            draft.bgIsColor != base.bgIsColor || draft.bgColor != base.bgColor ||
+            draft.fgResize != base.fgResize || draft.bgResize != base.bgResize ||
+            draft.fgRotation != base.fgRotation
 
     private fun setBusy(on: Boolean) {
         busy = on
@@ -375,8 +530,17 @@ class LogoCreateFragment : DialogFragment() {
         super.onDestroyView()
     }
 
+    override fun onDestroy() {
+        saveDraftOnExit()
+        super.onDestroy()
+    }
+
     companion object {
         const val TAG = "LogoCreateFragment"
+
+        /** Preview PNG handed to [HomeFragment] for the Step 1 card, in pixels. */
+        private const val PREVIEW_PX = 192
+
         const val RESULT_KEY = "logo_create_result"
         const val ARG_ZIP_PATH = "zip_path"
         const val ARG_PREVIEW_PATH = "preview_path"
@@ -388,4 +552,3 @@ class LogoCreateFragment : DialogFragment() {
             LogoCreateFragment().apply { arguments = bundleOf(ARG_EDITING to editing, ARG_URL to url) }
     }
 }
-

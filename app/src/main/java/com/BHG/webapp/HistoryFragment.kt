@@ -38,6 +38,14 @@ class HistoryFragment : Fragment() {
     // Build awaiting a choice from the download-options sheet.
     private var pendingDownload: BuildItem? = null
 
+    // Newest list the server sent, plus the raw doc data behind it, so moving an
+    // app to Trash can copy it without another read.
+    private var latestItems: List<BuildItem> = emptyList()
+    private var latestData: Map<String, Map<String, Any?>> = emptyMap()
+    // BuildIds the user just deleted: hidden from the list immediately, while the
+    // Firestore round-trip finishes in the background.
+    private val pendingRemovals = mutableSetOf<String>()
+
     override fun onCreateView(
         inflater: LayoutInflater,
         container: ViewGroup?,
@@ -120,9 +128,26 @@ class HistoryFragment : Fragment() {
                     )
                 }.orEmpty()
 
-                adapter.submitList(items)
-                showEmpty(items.isEmpty())
+                latestItems = items
+                latestData = snapshot?.documents?.associate { doc ->
+                    (doc.getString("buildId") ?: doc.id) to (doc.data ?: emptyMap<String, Any?>())
+                }.orEmpty()
+                // Anything the server no longer sends back is gone for good, so
+                // stop hiding it — the delete has landed.
+                pendingRemovals.retainAll(items.map { it.buildId }.toSet())
+                render()
             }
+    }
+
+    /**
+     * Draws [latestItems] minus the cards the user just deleted, so a delete
+     * shows up instantly and the listener catches up on its own afterwards.
+     */
+    private fun render() {
+        if (_binding == null) return
+        val visible = latestItems.filter { it.buildId !in pendingRemovals }
+        adapter.submitList(visible)
+        showEmpty(visible.isEmpty())
     }
 
     private fun showEmpty(empty: Boolean) {
@@ -239,32 +264,48 @@ class HistoryFragment : Fragment() {
             .show()
     }
 
+    /**
+     * Fire-and-forget move to Trash: the card is hidden and the toast shown
+     * straight away, and the copy-then-delete round-trip runs in the background
+     * — the snapshot listener removes the doc from the list when it lands. If it
+     * fails, the card comes back and we say so.
+     */
     private fun moveToTrash(item: BuildItem) {
         val user = auth?.currentUser ?: return
         val db = firestore ?: return
-        val builds = db.collection("users").document(user.uid).collection("builds")
-        val trash = db.collection("users").document(user.uid).collection("trashApps")
 
-        builds.document(item.buildId).get()
-            .addOnSuccessListener { snap ->
-                if (!isAdded) return@addOnSuccessListener
-                val data = HashMap(snap.data ?: emptyMap())
-                data["trashedAt"] = FieldValue.serverTimestamp()
-                trash.document(item.buildId).set(data)
-                    .addOnSuccessListener {
-                        builds.document(item.buildId).delete()
-                            .addOnSuccessListener {
-                                if (isAdded) Toast.makeText(requireContext(), R.string.moved_to_trash, Toast.LENGTH_SHORT).show()
-                            }
-                            .addOnFailureListener { failTrashOp(it) }
-                    }
-                    .addOnFailureListener { failTrashOp(it) }
-            }
-            .addOnFailureListener { failTrashOp(it) }
+        val raw = latestData[item.buildId]
+        if (raw == null) {
+            // Nothing cached to copy — the doc is already gone; let the listener
+            // settle the list on its own.
+            pendingRemovals.remove(item.buildId)
+            render()
+            return
+        }
+
+        // Optimistic: drop the card now, don't wait for Firestore.
+        pendingRemovals.add(item.buildId)
+        render()
+        if (isAdded) Toast.makeText(requireContext(), R.string.moved_to_trash, Toast.LENGTH_SHORT).show()
+
+        val source = db.collection("users").document(user.uid)
+            .collection("builds").document(item.buildId)
+        val trash = db.collection("users").document(user.uid)
+            .collection("trashApps").document(item.buildId)
+
+        val data = HashMap<String, Any?>(raw)
+        data["trashedAt"] = FieldValue.serverTimestamp()
+
+        // No success handling needed: the listener reports the result for us.
+        trash.set(data)
+            .addOnSuccessListener { source.delete().addOnFailureListener { failTrashOp(item, it) } }
+            .addOnFailureListener { failTrashOp(item, it) }
     }
 
-    private fun failTrashOp(e: Exception) {
+    private fun failTrashOp(item: BuildItem, e: Exception) {
         Log.w(TAG, "Move to trash failed: ${e.message}", e)
+        pendingRemovals.remove(item.buildId)
+        render()
         if (isAdded) Toast.makeText(requireContext(), R.string.delete_failed, Toast.LENGTH_SHORT).show()
     }
 

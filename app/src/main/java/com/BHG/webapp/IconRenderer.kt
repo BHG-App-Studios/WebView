@@ -59,13 +59,13 @@ object IconRenderer {
         canvas.drawBitmap(src, null, RectF(left, top, left + w, top + h), paint)
     }
 
-    private fun renderForeground(cfg: Config, size: Int): Bitmap {
+    fun renderForeground(cfg: Config, size: Int): Bitmap {
         val bmp = newCanvas(size)
         drawFitted(Canvas(bmp), cfg.foreground, size, cfg.fgResizePct)
         return bmp
     }
 
-    private fun renderBackground(cfg: Config, size: Int): Bitmap {
+    fun renderBackground(cfg: Config, size: Int): Bitmap {
         val bmp = newCanvas(size)
         val c = Canvas(bmp)
         if (cfg.bgIsColor) {
@@ -82,6 +82,22 @@ object IconRenderer {
         val c = Canvas(bmp)
         c.drawBitmap(renderBackground(cfg, size), 0f, 0f, null)
         c.drawBitmap(renderForeground(cfg, size), 0f, 0f, null)
+        return bmp
+    }
+
+    /** Foreground layer alone (transparent elsewhere) — for the section preview. */
+    fun previewForeground(fg: Bitmap, pct: Int, size: Int): Bitmap {
+        val bmp = newCanvas(size)
+        drawFitted(Canvas(bmp), fg, size, pct)
+        return bmp
+    }
+
+    /** Background layer alone (colour fill or fitted image) — for the section preview. */
+    fun previewBackground(bgIsColor: Boolean, bgColor: Int, bgImage: Bitmap?, pct: Int, size: Int): Bitmap {
+        val bmp = newCanvas(size)
+        val c = Canvas(bmp)
+        if (bgIsColor) c.drawColor(bgColor)
+        else if (bgImage != null) drawFitted(c, bgImage, size, pct)
         return bmp
     }
 

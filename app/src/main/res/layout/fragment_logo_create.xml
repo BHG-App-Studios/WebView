@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
@@ -65,70 +66,126 @@
                 android:text="@string/logo_subtitle"
                 android:textAppearance="?attr/textAppearanceBodyMedium"
                 android:textColor="?attr/colorOnSurfaceVariant"
-                android:layout_marginBottom="16dp" />
+                android:layout_marginBottom="18dp" />
 
-            <!-- PREVIEW -->
+            <!-- PREVIEW: the actual adaptive icon in both mask shapes -->
             <TextView
-                android:layout_width="wrap_content"
+                style="@style/Logo.SectionLabel"
+                android:text="@string/logo_preview" />
+
+            <com.google.android.material.card.MaterialCardView
+                style="@style/Widget.App.Card"
+                android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/logo_preview"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textAllCaps="true"
-                android:letterSpacing="0.06"
-                android:layout_marginBottom="10dp" />
+                android:layout_marginTop="10dp"
+                app:cardBackgroundColor="?attr/colorSurfaceVariant"
+                app:cardCornerRadius="20dp"
+                app:strokeWidth="0dp">
+
+                <LinearLayout
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content"
+                    android:orientation="horizontal"
+                    android:gravity="center"
+                    android:padding="20dp">
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center">
+
+                        <ImageView
+                            android:id="@+id/previewRound"
+                            android:layout_width="110dp"
+                            android:layout_height="110dp"
+                            android:scaleType="fitCenter"
+                            android:contentDescription="@string/logo_preview" />
+
+                        <TextView
+                            style="@style/Logo.Caption"
+                            android:text="@string/logo_shape_square" />
+                    </LinearLayout>
+
+                    <LinearLayout
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical"
+                        android:gravity="center"
+                        android:layout_marginStart="24dp">
+
+                        <ImageView
+                            android:id="@+id/previewCircle"
+                            android:layout_width="110dp"
+                            android:layout_height="110dp"
+                            android:scaleType="fitCenter"
+                            android:contentDescription="@string/logo_preview" />
+
+                        <TextView
+                            style="@style/Logo.Caption"
+                            android:text="@string/logo_shape_circle" />
+                    </LinearLayout>
+                </LinearLayout>
+            </com.google.android.material.card.MaterialCardView>
+
+            <!-- FOREGROUND -->
+            <TextView
+                style="@style/Logo.SectionLabel"
+                android:layout_marginTop="24dp"
+                android:text="@string/logo_section_foreground" />
 
             <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="horizontal"
-                android:gravity="center"
-                android:layout_marginBottom="20dp">
+                android:gravity="center_vertical"
+                android:layout_marginTop="8dp">
 
                 <ImageView
-                    android:id="@+id/previewRound"
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:background="@drawable/bg_logo_tile"
-                    android:scaleType="fitCenter" />
+                    android:id="@+id/fgPreview"
+                    android:layout_width="64dp"
+                    android:layout_height="64dp"
+                    android:padding="6dp"
+                    android:background="@drawable/bg_preview_tile"
+                    android:scaleType="fitCenter"
+                    android:contentDescription="@string/logo_section_foreground" />
 
-                <ImageView
-                    android:id="@+id/previewCircle"
-                    android:layout_width="120dp"
-                    android:layout_height="120dp"
-                    android:layout_marginStart="18dp"
-                    android:background="@drawable/bg_logo_tile"
-                    android:scaleType="fitCenter" />
+                <com.google.android.material.button.MaterialButton
+                    android:id="@+id/fgPickButton"
+                    style="@style/Widget.App.OutlinedButton.Neutral"
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:layout_marginStart="12dp"
+                    android:text="@string/logo_pick_foreground"
+                    app:icon="@drawable/ic_image"
+                    app:iconGravity="textStart" />
             </LinearLayout>
 
-            <!-- FOREGROUND -->
-            <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/logo_section_foreground"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textAllCaps="true"
-                android:letterSpacing="0.06"
-                android:layout_marginBottom="8dp" />
-
-            <com.google.android.material.button.MaterialButton
-                android:id="@+id/fgPickButton"
-                style="@style/Widget.App.OutlinedButton.Neutral"
+            <LinearLayout
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:text="@string/logo_pick_foreground"
-                app:icon="@drawable/ic_image"
-                app:iconGravity="textStart" />
+                android:orientation="horizontal"
+                android:gravity="center_vertical"
+                android:layout_marginTop="14dp">
 
-            <TextView
-                android:id="@+id/fgSizeLabel"
-                android:layout_width="match_parent"
-                android:layout_height="wrap_content"
-                android:text="@string/logo_foreground_size"
-                android:textAppearance="?attr/textAppearanceBodyMedium"
-                android:textColor="?attr/colorOnSurface"
-                android:layout_marginTop="12dp" />
+                <TextView
+                    android:layout_width="0dp"
+                    android:layout_weight="1"
+                    android:layout_height="wrap_content"
+                    android:text="@string/logo_foreground_size"
+                    android:textAppearance="?attr/textAppearanceBodyMedium"
+                    android:textColor="?attr/colorOnSurface" />
+
+                <TextView
+                    android:id="@+id/fgSizeValue"
+                    android:layout_width="wrap_content"
+                    android:layout_height="wrap_content"
+                    android:textAppearance="?attr/textAppearanceLabelLarge"
+                    android:textColor="?attr/colorPrimary"
+                    tools:ignore="HardcodedText"
+                    android:text="69%" />
+            </LinearLayout>
 
             <com.google.android.material.slider.Slider
                 android:id="@+id/fgSizeSlider"
@@ -141,20 +198,15 @@
 
             <!-- BACKGROUND -->
             <TextView
-                android:layout_width="wrap_content"
-                android:layout_height="wrap_content"
-                android:text="@string/logo_section_background"
-                android:textAppearance="?attr/textAppearanceLabelLarge"
-                android:textColor="?attr/colorOnSurfaceVariant"
-                android:textAllCaps="true"
-                android:letterSpacing="0.06"
+                style="@style/Logo.SectionLabel"
                 android:layout_marginTop="16dp"
-                android:layout_marginBottom="8dp" />
+                android:text="@string/logo_section_background" />
 
             <com.google.android.material.button.MaterialButtonToggleGroup
                 android:id="@+id/bgTypeToggle"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
+                android:layout_marginTop="8dp"
                 app:singleSelection="true"
                 app:selectionRequired="true">
 
@@ -181,7 +233,7 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="12dp">
+                android:layout_marginTop="14dp">
 
                 <LinearLayout
                     android:layout_width="match_parent"
@@ -189,11 +241,22 @@
                     android:orientation="horizontal"
                     android:gravity="center_vertical">
 
-                    <View
-                        android:id="@+id/bgColorSwatch"
-                        android:layout_width="44dp"
-                        android:layout_height="44dp"
-                        android:background="@drawable/bg_logo_tile" />
+                    <com.google.android.material.card.MaterialCardView
+                        android:id="@+id/bgColorSwatchCard"
+                        android:layout_width="52dp"
+                        android:layout_height="52dp"
+                        android:clickable="true"
+                        android:focusable="true"
+                        app:cardCornerRadius="14dp"
+                        app:strokeWidth="1dp"
+                        app:strokeColor="?attr/colorOutline"
+                        app:cardElevation="0dp">
+
+                        <View
+                            android:id="@+id/bgColorSwatch"
+                            android:layout_width="match_parent"
+                            android:layout_height="match_parent" />
+                    </com.google.android.material.card.MaterialCardView>
 
                     <com.google.android.material.textfield.TextInputLayout
                         android:id="@+id/bgColorHexLayout"
@@ -202,6 +265,9 @@
                         android:layout_weight="1"
                         android:layout_height="wrap_content"
                         android:layout_marginStart="12dp"
+                        app:endIconMode="custom"
+                        app:endIconDrawable="@drawable/ic_palette"
+                        app:endIconContentDescription="@string/logo_open_picker"
                         android:hint="@string/logo_bg_color">
 
                         <com.google.android.material.textfield.TextInputEditText
@@ -220,7 +286,7 @@
                     android:id="@+id/bgSwatchRow"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:layout_marginTop="8dp"
+                    android:layout_marginTop="10dp"
                     app:singleLine="true" />
             </LinearLayout>
 
@@ -230,25 +296,59 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:orientation="vertical"
-                android:layout_marginTop="12dp"
+                android:layout_marginTop="14dp"
                 android:visibility="gone">
 
-                <com.google.android.material.button.MaterialButton
-                    android:id="@+id/bgPickButton"
-                    style="@style/Widget.App.OutlinedButton.Neutral"
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/logo_pick_background"
-                    app:icon="@drawable/ic_image"
-                    app:iconGravity="textStart" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical">
 
-                <TextView
+                    <ImageView
+                        android:id="@+id/bgPreview"
+                        android:layout_width="64dp"
+                        android:layout_height="64dp"
+                        android:background="@drawable/bg_preview_tile"
+                        android:scaleType="centerCrop"
+                        android:contentDescription="@string/logo_section_background" />
+
+                    <com.google.android.material.button.MaterialButton
+                        android:id="@+id/bgPickButton"
+                        style="@style/Widget.App.OutlinedButton.Neutral"
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:layout_marginStart="12dp"
+                        android:text="@string/logo_pick_background"
+                        app:icon="@drawable/ic_image"
+                        app:iconGravity="textStart" />
+                </LinearLayout>
+
+                <LinearLayout
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
-                    android:text="@string/logo_background_size"
-                    android:textAppearance="?attr/textAppearanceBodyMedium"
-                    android:textColor="?attr/colorOnSurface"
-                    android:layout_marginTop="12dp" />
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:layout_marginTop="14dp">
+
+                    <TextView
+                        android:layout_width="0dp"
+                        android:layout_weight="1"
+                        android:layout_height="wrap_content"
+                        android:text="@string/logo_background_size"
+                        android:textAppearance="?attr/textAppearanceBodyMedium"
+                        android:textColor="?attr/colorOnSurface" />
+
+                    <TextView
+                        android:id="@+id/bgSizeValue"
+                        android:layout_width="wrap_content"
+                        android:layout_height="wrap_content"
+                        android:textAppearance="?attr/textAppearanceLabelLarge"
+                        android:textColor="?attr/colorPrimary"
+                        tools:ignore="HardcodedText"
+                        android:text="100%" />
+                </LinearLayout>
 
                 <com.google.android.material.slider.Slider
                     android:id="@+id/bgSizeSlider"

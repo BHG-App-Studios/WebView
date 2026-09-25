@@ -81,9 +81,15 @@ class LogoCreateFragment : DialogFragment() {
         b.bgPickButton.setOnClickListener { pickBg.launch("image/*") }
 
         b.fgSizeSlider.value = fgResize.toFloat()
-        b.fgSizeSlider.addOnChangeListener { _, v, _ -> fgResize = v.toInt(); refresh() }
+        b.fgSizeValue.text = pct(fgResize)
+        b.fgSizeSlider.addOnChangeListener { _, v, _ ->
+            fgResize = v.toInt(); b.fgSizeValue.text = pct(fgResize); refresh()
+        }
         b.bgSizeSlider.value = bgResize.toFloat()
-        b.bgSizeSlider.addOnChangeListener { _, v, _ -> bgResize = v.toInt(); refresh() }
+        b.bgSizeValue.text = pct(bgResize)
+        b.bgSizeSlider.addOnChangeListener { _, v, _ ->
+            bgResize = v.toInt(); b.bgSizeValue.text = pct(bgResize); refresh()
+        }
 
         b.bgTypeToggle.check(b.bgTypeColor.id)
         b.bgTypeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -96,6 +102,9 @@ class LogoCreateFragment : DialogFragment() {
             override fun onTextChanged(s: CharSequence?, a: Int, b2: Int, c: Int) {}
             override fun afterTextChanged(s: Editable?) { parseHex(s?.toString()) }
         })
+        // The swatch and the field's trailing icon both open the real picker.
+        b.bgColorSwatchCard.setOnClickListener { openColorPicker() }
+        b.bgColorHexLayout.setEndIconOnClickListener { openColorPicker() }
         buildSwatches()
 
         b.useLogoButton.setOnClickListener { onUse() }
@@ -173,14 +182,83 @@ class LogoCreateFragment : DialogFragment() {
 
     private fun refresh() {
         b.bgColorSwatch.setBackgroundColor(bgColor)
+
+        // Separate layer previews so each choice is visible on its own.
+        val f = fg
+        if (f != null) b.fgPreview.setImageBitmap(IconRenderer.previewForeground(f, fgResize, 216))
+        else b.fgPreview.setImageDrawable(null)
+
+        if (!bgIsColor) {
+            b.bgPreview.setImageBitmap(
+                IconRenderer.previewBackground(false, bgColor, bgImg, bgResize, 216)
+            )
+        }
+
+        // Composite adaptive icon in both mask shapes.
         val cfg = currentConfig()
         if (cfg == null) {
             b.previewRound.setImageDrawable(null)
             b.previewCircle.setImageDrawable(null)
             return
         }
-        b.previewRound.setImageBitmap(IconRenderer.renderLegacy(cfg, 192, "square"))
-        b.previewCircle.setImageBitmap(IconRenderer.renderLegacy(cfg, 192, "circle"))
+        b.previewRound.setImageBitmap(IconRenderer.renderLegacy(cfg, 216, "square"))
+        b.previewCircle.setImageBitmap(IconRenderer.renderLegacy(cfg, 216, "circle"))
+    }
+
+    private fun pct(v: Int): String = "$v%"
+
+    /** Opens the real HSV colour picker seeded with the current background colour. */
+    private fun openColorPicker() {
+        val ctx = requireContext()
+        val pad = dp(20)
+        val container = LinearLayout(ctx).apply {
+            orientation = LinearLayout.VERTICAL
+            setPadding(pad, dp(8), pad, 0)
+        }
+
+        val picker = ColorPickerView(ctx).apply {
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, dp(260)
+            )
+            setColor(bgColor)
+        }
+        val hexField = android.widget.EditText(ctx).apply {
+            setText(hex(bgColor))
+            setSingleLine()
+            filters = arrayOf(android.text.InputFilter.LengthFilter(7))
+            layoutParams = LinearLayout.LayoutParams(
+                LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT
+            ).apply { topMargin = dp(12) }
+        }
+        container.addView(picker)
+        container.addView(hexField)
+
+        var chosen = bgColor
+        var syncing = false
+        picker.onColorChanged = { c ->
+            chosen = c
+            if (!syncing) { syncing = true; hexField.setText(hex(c)); syncing = false }
+        }
+        hexField.addTextChangedListener(object : TextWatcher {
+            override fun beforeTextChanged(s: CharSequence?, a: Int, b2: Int, c: Int) {}
+            override fun onTextChanged(s: CharSequence?, a: Int, b2: Int, c: Int) {}
+            override fun afterTextChanged(s: Editable?) {
+                if (syncing) return
+                var v = s?.toString()?.trim().orEmpty()
+                if (!v.startsWith("#")) v = "#$v"
+                if (Regex("^#[0-9a-fA-F]{6}$").matches(v)) {
+                    chosen = Color.parseColor(v)
+                    syncing = true; picker.setColor(chosen); syncing = false
+                }
+            }
+        })
+
+        com.google.android.material.dialog.MaterialAlertDialogBuilder(ctx)
+            .setTitle(R.string.logo_color_picker_title)
+            .setView(container)
+            .setPositiveButton(android.R.string.ok) { _, _ -> setColor(hex(chosen)) }
+            .setNegativeButton(android.R.string.cancel, null)
+            .show()
     }
 
     private fun decode(uri: Uri): Bitmap? = try {

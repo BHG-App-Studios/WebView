@@ -263,6 +263,10 @@
     <string name="logo_bg_type_image">Image</string>
     <string name="logo_bg_color">Background color</string>
     <string name="logo_preview">Preview</string>
+    <string name="logo_shape_square">Rounded</string>
+    <string name="logo_shape_circle">Circle</string>
+    <string name="logo_open_picker">Open color picker</string>
+    <string name="logo_color_picker_title">Pick a color</string>
     <string name="logo_use">Use this logo</string>
     <string name="logo_remove">Remove logo</string>
     <string name="logo_need_foreground">Choose a foreground image first</string>

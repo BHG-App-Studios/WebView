@@ -8,16 +8,13 @@
     android:layout_height="wrap_content"
     android:clipToPadding="false"
     android:scrollbars="none"
-    android:layout_marginStart="12dp"
-    android:layout_marginEnd="12dp"
-    android:layout_marginBottom="12dp"
     android:maxHeight="640dp">
 
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:orientation="vertical"
-        android:background="@drawable/bg_sheet_floating"
+        android:background="@drawable/bg_sheet_top_rounded"
         android:paddingStart="24dp"
         android:paddingEnd="24dp"
         android:paddingTop="20dp"
@@ -44,7 +41,7 @@
                 android:layout_width="40dp"
                 android:layout_height="40dp"
                 android:background="?attr/selectableItemBackgroundBorderless"
-                android:src="@drawable/ic_arrow_back"
+                android:src="@drawable/ic_close"
                 android:contentDescription="@string/action_cancel"
                 app:tint="?attr/colorOnSurfaceVariant" />
         </LinearLayout>

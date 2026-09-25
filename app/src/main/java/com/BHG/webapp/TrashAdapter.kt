@@ -3,7 +3,6 @@ package com.BHG.webapp
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
-import androidx.core.content.ContextCompat
 import androidx.recyclerview.widget.DiffUtil
 import androidx.recyclerview.widget.ListAdapter
 import androidx.recyclerview.widget.RecyclerView
@@ -40,14 +39,6 @@ class TrashAdapter(
         b.itemAppName.text = item.appName.ifEmpty { ctx.getString(R.string.app_display_name) }
         b.itemUrl.text = item.url
         b.itemDate.text = if (item.createdAtMs > 0) BuildInfoPanel.DATE_FMT.format(Date(item.createdAtMs)) else ""
-
-        val (labelRes, colorAttr) = when (item.status) {
-            "READY" -> R.string.status_ready to R.color.success
-            "FAILED", "REJECTED" -> R.string.status_failed to R.color.error
-            else -> R.string.status_building to R.color.text_secondary
-        }
-        b.itemStatus.text = ctx.getString(labelRes)
-        b.itemStatus.setTextColor(ContextCompat.getColor(ctx, colorAttr))
 
         val showSize = item.status == "READY" && item.sizeBytes > 0
         b.itemSize.visibility = if (showSize) View.VISIBLE else View.GONE

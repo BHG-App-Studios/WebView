@@ -72,16 +72,11 @@
                     android:gravity="center_vertical">
 
                     <TextView
-                        android:id="@+id/itemStatus"
+                        android:id="@+id/itemDate"
                         android:layout_width="wrap_content"
                         android:layout_height="wrap_content"
-                        android:background="@drawable/bg_status_pill"
-                        android:paddingStart="10dp"
-                        android:paddingEnd="10dp"
-                        android:paddingTop="3dp"
-                        android:paddingBottom="3dp"
-                        android:fontFamily="@font/roboto_semibold"
-                        android:textAppearance="?attr/textAppearanceBodySmall" />
+                        android:textAppearance="?attr/textAppearanceBodySmall"
+                        android:textColor="?attr/colorOnSurfaceVariant" />
 
                     <TextView
                         android:id="@+id/itemSize"
@@ -91,14 +86,6 @@
                         android:textAppearance="?attr/textAppearanceBodySmall"
                         android:textColor="?attr/colorOnSurfaceVariant"
                         android:visibility="gone" />
-
-                    <TextView
-                        android:id="@+id/itemDate"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content"
-                        android:layout_marginStart="8dp"
-                        android:textAppearance="?attr/textAppearanceBodySmall"
-                        android:textColor="?attr/colorOnSurfaceVariant" />
                 </LinearLayout>
             </LinearLayout>
         </LinearLayout>
@@ -130,10 +117,12 @@
                 android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:textSize="11sp"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:text="@string/action_info"
                 app:icon="@drawable/ic_info"
                 app:iconGravity="top"
                 app:iconSize="20dp"
+                app:iconTint="?attr/colorOnSurfaceVariant"
                 app:iconPadding="2dp" />
 
             <com.google.android.material.button.MaterialButton
@@ -147,10 +136,12 @@
                 android:paddingStart="2dp"
                 android:paddingEnd="2dp"
                 android:textSize="11sp"
+                android:textColor="?attr/colorOnSurfaceVariant"
                 android:text="@string/action_restore"
                 app:icon="@drawable/ic_update"
                 app:iconGravity="top"
                 app:iconSize="20dp"
+                app:iconTint="?attr/colorOnSurfaceVariant"
                 app:iconPadding="2dp" />
 
             <com.google.android.material.button.MaterialButton

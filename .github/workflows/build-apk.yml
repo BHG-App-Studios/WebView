@@ -106,6 +106,47 @@ jobs:
           grep -n "versionCode\|versionName" app/build.gradle
           grep -n "app_name" app/src/main/res/values/strings.xml
 
+      # Custom launcher icon (optional). The app generates the whole res/ icon
+      # set natively (adaptive layers, legacy mipmaps, auto monochrome) and the
+      # Worker stashes it in R2. Like signing material, the bytes never ride in
+      # the dispatch payload: we fetch the ZIP from the secret-gated endpoint
+      # and unzip it over app/src/main/. Skipped when the build keeps the
+      # template's default launcher (icon_fetch_url empty).
+      - name: Apply custom icon
+        working-directory: ./Splash_WebView
+        env:
+          ICON_FETCH_URL: ${{ github.event.client_payload.build.icon_fetch_url }}
+          BUILD_SECRET: ${{ secrets.WORKER_BUILD_SECRET }}
+        run: |
+          if [ -z "$ICON_FETCH_URL" ]; then
+            echo "No custom icon for this build - keeping the template default."
+            exit 0
+          fi
+
+          echo "Fetching custom icon set..."
+          curl -s -f -H "X-Build-Secret: $BUILD_SECRET" "$ICON_FETCH_URL" -o /tmp/icons.zip || {
+            echo "::error::Could not fetch custom icon package"; exit 1; }
+
+          RES="app/src/main/res"
+
+          # Drop the template's launcher assets first. The generated set is the
+          # single source of truth; a leftover file with a different extension
+          # (e.g. an existing ic_launcher.png vs the new ic_launcher.webp) is a
+          # duplicate resource and would fail aapt. Clears both the mipmap
+          # bitmaps and the adaptive-icon XMLs (mipmap-anydpi-v26 matches too).
+          for d in "$RES"/mipmap-*; do
+            [ -d "$d" ] || continue
+            rm -f "$d"/ic_launcher*.png "$d"/ic_launcher*.webp "$d"/ic_launcher*.xml
+          done
+
+          # The archive is rooted at app/src/main/ (res/mipmap-*/…, the adaptive
+          # XMLs, and - for a colour background - values/ic_launcher_background.xml).
+          unzip -o /tmp/icons.zip -d app/src/main/ >/dev/null
+          rm -f /tmp/icons.zip
+
+          echo "Custom icon applied. Launcher resources now:"
+          find "$RES" -name 'ic_launcher*' | sort
+
       # ---------------------------------------------------------------------
       # Signing material. Passwords and keystore bytes never travel in the
       # dispatch payload (it is echoed to the log). Instead the runner fetches

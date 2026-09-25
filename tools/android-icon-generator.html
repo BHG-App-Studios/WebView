@@ -1,0 +1,494 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Android Launcher Icon Generator</title>
+<script src="https://cdn.jsdelivr.net/npm/jszip@3.10.1/dist/jszip.min.js"></script>
+<style>
+:root{
+  --bg:#1e1f22; --panel:#2b2d30; --panel2:#313438; --line:#3c3f43;
+  --text:#dfe1e5; --muted:#9aa0a6; --accent:#3574f0; --accent2:#4d84f5;
+  --warn:#e5a01a; --ok:#4caf50;
+}
+*{box-sizing:border-box}
+body{margin:0;font-family:'Segoe UI',Roboto,system-ui,sans-serif;background:var(--bg);color:var(--text);font-size:13px}
+h1{font-size:16px;margin:0}
+header{background:var(--panel);padding:12px 18px;border-bottom:1px solid var(--line);display:flex;align-items:center;gap:12px}
+header .logo{width:28px;height:28px;border-radius:6px;background:linear-gradient(135deg,#3574f0,#8a5cf6)}
+.wrap{display:flex;gap:16px;padding:16px;align-items:flex-start;flex-wrap:wrap}
+.controls{flex:1 1 380px;min-width:340px;max-width:520px}
+.preview{flex:1 1 420px;min-width:340px;position:sticky;top:16px}
+.card{background:var(--panel);border:1px solid var(--line);border-radius:10px;padding:14px 16px;margin-bottom:14px}
+.card h2{font-size:13px;text-transform:uppercase;letter-spacing:.5px;color:var(--muted);margin:0 0 12px}
+.tabs{display:flex;gap:4px;margin-bottom:12px;background:var(--panel2);padding:4px;border-radius:8px}
+.tabs button{flex:1;background:none;border:none;color:var(--muted);padding:8px;border-radius:6px;cursor:pointer;font-size:12px}
+.tabs button.active{background:var(--accent);color:#fff}
+.row{display:flex;align-items:center;gap:10px;margin-bottom:12px}
+.row label{width:120px;color:var(--muted);flex-shrink:0}
+.row .val{width:44px;text-align:right;color:var(--text)}
+input[type=range]{flex:1;accent-color:var(--accent)}
+input[type=text],input[type=number],select{background:var(--panel2);border:1px solid var(--line);color:var(--text);border-radius:6px;padding:6px 8px}
+input[type=color]{width:40px;height:30px;border:1px solid var(--line);border-radius:6px;background:none;padding:2px}
+input[type=file]{color:var(--muted);font-size:12px}
+.seg{display:flex;gap:0;border:1px solid var(--line);border-radius:6px;overflow:hidden}
+.seg button{background:var(--panel2);border:none;color:var(--muted);padding:6px 12px;cursor:pointer;font-size:12px}
+.seg button.active{background:var(--accent);color:#fff}
+button.primary{background:var(--accent);color:#fff;border:none;padding:10px 16px;border-radius:8px;cursor:pointer;font-size:13px;font-weight:600}
+button.primary:hover{background:var(--accent2)}
+button.ghost{background:var(--panel2);color:var(--text);border:1px solid var(--line);padding:10px 16px;border-radius:8px;cursor:pointer}
+.hint{color:var(--muted);font-size:11px;line-height:1.5;margin-top:8px}
+.pane{display:none}
+.pane.active{display:block}
+.previewGrid{display:grid;grid-template-columns:repeat(3,1fr);gap:14px}
+.pv{text-align:center}
+.pv canvas{width:100%;background:conic-gradient(#0000 90deg,#2a2a2a 0 180deg,#0000 0 270deg,#2a2a2a 0) 0 0/16px 16px;border-radius:8px}
+.pv span{display:block;color:var(--muted);font-size:11px;margin-top:6px}
+.big{grid-column:span 3;max-width:260px;margin:0 auto}
+.toolbar{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin-top:6px}
+.status{font-size:12px;color:var(--muted);margin-top:10px;min-height:16px}
+.warn{color:var(--warn)}
+.ok{color:var(--ok)}
+a.dl{color:var(--accent2)}
+code{background:var(--panel2);padding:1px 5px;border-radius:4px}
+</style>
+</head>
+<body>
+<header>
+  <div class="logo"></div>
+  <h1>Android Launcher Icon Generator</h1>
+  <span class="hint" style="margin:0">Adaptive + Legacy + Monochrome · matches Android Studio's Image Asset output</span>
+</header>
+<div class="wrap">
+  <!-- LEFT: CONTROLS -->
+  <div class="controls">
+    <div class="tabs">
+      <button data-tab="fg" class="active">Foreground</button>
+      <button data-tab="bg">Background</button>
+      <button data-tab="mono">Monochrome</button>
+      <button data-tab="opts">Options</button>
+    </div>
+
+    <!-- FOREGROUND -->
+    <div class="pane active" id="pane-fg">
+      <div class="card">
+        <h2>Foreground layer</h2>
+        <div class="row"><label>Image</label><input type="file" id="fgFile" accept="image/*"></div>
+        <div class="row"><label>Trim edges</label>
+          <div class="seg" id="fgTrim"><button data-v="0" class="active">No</button><button data-v="1">Yes</button></div>
+        </div>
+        <div class="row"><label>Resize</label><input type="range" id="fgResize" min="1" max="200" value="69"><span class="val" id="fgResizeV">69%</span></div>
+        <p class="hint">100% = the image's longest side fills the full 108dp canvas. Studio's default for a fitted logo is usually ~65-70%.</p>
+      </div>
+    </div>
+
+    <!-- BACKGROUND -->
+    <div class="pane" id="pane-bg">
+      <div class="card">
+        <h2>Background layer</h2>
+        <div class="row"><label>Type</label>
+          <div class="seg" id="bgType"><button data-v="color" class="active">Color</button><button data-v="image">Image</button></div>
+        </div>
+        <div class="row" id="bgColorRow"><label>Color</label>
+          <input type="color" id="bgColor" value="#FAFAFA">
+          <input type="text" id="bgColorHex" value="#FAFAFA" style="width:110px">
+        </div>
+        <div class="row" id="bgImgRow" style="display:none"><label>Image</label><input type="file" id="bgFile" accept="image/*"></div>
+        <div class="row" id="bgResizeRow" style="display:none"><label>Resize</label><input type="range" id="bgResize" min="1" max="200" value="100"><span class="val" id="bgResizeV">100%</span></div>
+      </div>
+    </div>
+
+    <!-- MONOCHROME -->
+    <div class="pane" id="pane-mono">
+      <div class="card">
+        <h2>Monochrome layer (themed icons)</h2>
+        <div class="row"><label>Source</label>
+          <div class="seg" id="monoMode">
+            <button data-v="auto" class="active">Auto from FG</button>
+            <button data-v="image">Image</button>
+            <button data-v="off">None</button>
+          </div>
+        </div>
+        <div class="row" id="monoImgRow" style="display:none"><label>Image</label><input type="file" id="monoFile" accept="image/*"></div>
+        <div class="row" id="monoResizeRow"><label>Resize</label><input type="range" id="monoResize" min="1" max="200" value="69"><span class="val" id="monoResizeV">69%</span></div>
+        <p class="hint"><b>Auto from FG</b> turns your foreground into a solid silhouette (keeps anti-aliased alpha). Android tints it at runtime, so the stored pixels are black + transparent — this is the "foreground + background → monochrome automatically" behaviour.</p>
+      </div>
+    </div>
+
+    <!-- OPTIONS -->
+    <div class="pane" id="pane-opts">
+      <div class="card">
+        <h2>Names &amp; legacy shape</h2>
+        <div class="row"><label>Icon name</label><input type="text" id="iconName" value="ic_launcher" style="width:160px"></div>
+        <div class="row"><label>Legacy shape</label>
+          <div class="seg" id="legShape"><button data-v="square" class="active">Rounded sq</button><button data-v="circle">Circle</button><button data-v="squircle">Squircle</button></div>
+        </div>
+        <div class="row"><label>WebP quality</label><input type="range" id="quality" min="70" max="100" value="100"><span class="val" id="qualityV">100</span></div>
+        <p class="hint">Output densities: mdpi/hdpi/xhdpi/xxhdpi/xxxhdpi. Adaptive layers 108→432px, legacy icons 48→192px, Play Store 512px.</p>
+      </div>
+    </div>
+
+    <div class="card">
+      <h2>Export</h2>
+      <div class="toolbar">
+        <button class="primary" id="btnZip">⬇ Download ZIP (res/…)</button>
+        <button class="ghost" id="btnDir">📁 Write into folder…</button>
+        <button class="ghost" id="btnPlay">⬇ Play Store PNG</button>
+      </div>
+      <div class="hint" id="dirInfo" style="margin-top:8px"></div>
+      <div class="status" id="status"></div>
+      <p class="hint">ZIP mirrors <code>app/src/main/</code> — extract it there and everything lands in the right place (overwriting the old icons). "Write into folder" (Chrome/Edge, needs a local server or an allowed context) lets you pick your <code>res</code> folder and writes files directly.</p>
+    </div>
+  </div>
+
+  <!-- RIGHT: PREVIEW -->
+  <div class="preview">
+    <div class="card">
+      <h2>Preview
+        <select id="pvDensity" style="float:right;margin-top:-4px">
+          <option value="mdpi">mdpi</option><option value="hdpi">hdpi</option>
+          <option value="xhdpi" selected>xhdpi</option><option value="xxhdpi">xxhdpi</option>
+          <option value="xxxhdpi">xxxhdpi</option>
+        </select>
+      </h2>
+      <div class="previewGrid">
+        <div class="pv"><canvas id="cvRound"></canvas><span>Rounded Square</span></div>
+        <div class="pv"><canvas id="cvSquare"></canvas><span>Circle</span></div>
+        <div class="pv"><canvas id="cvBleed"></canvas><span>Full Bleed (safe zone)</span></div>
+        <div class="pv big"><canvas id="cvBig"></canvas><span>Play Store 512</span></div>
+        <div class="pv"><canvas id="cvLegacy"></canvas><span>Legacy Icon</span></div>
+        <div class="pv"><canvas id="cvLegacyR"></canvas><span>Round Icon</span></div>
+        <div class="pv"><canvas id="cvMono"></canvas><span>Monochrome</span></div>
+      </div>
+    </div>
+  </div>
+</div>
+<script>
+"use strict";
+// ---- density tables (px) ----
+const ADAPTIVE = {mdpi:108, hdpi:162, xhdpi:216, xxhdpi:324, xxxhdpi:432};
+const LEGACY   = {mdpi:48,  hdpi:72,  xhdpi:96,  xxhdpi:144, xxxhdpi:192};
+const DENSITIES = Object.keys(ADAPTIVE);
+const PLAYSTORE = 512;
+const SAFE_RATIO = 66/108;   // safe-zone diameter within the 108dp canvas
+const VIEW_RATIO = 72/108;   // legacy viewport within the 108dp canvas
+
+// ---- state ----
+const state = {
+  fg:{img:null, trim:false, resize:69},
+  bg:{type:'color', color:'#FAFAFA', img:null, resize:100},
+  mono:{mode:'auto', img:null, resize:69},
+  name:'ic_launcher', legShape:'square', quality:100
+};
+
+const $ = s => document.querySelector(s);
+const $$ = s => document.querySelectorAll(s);
+
+function loadImage(file){
+  return new Promise((res,rej)=>{
+    const img = new Image();
+    img.onload = ()=>res(img);
+    img.onerror = rej;
+    img.src = URL.createObjectURL(file);
+  });
+}
+
+// trim transparent border, return a canvas cropped to the visible pixels
+function trimmed(img){
+  const c = document.createElement('canvas');
+  c.width = img.naturalWidth||img.width; c.height = img.naturalHeight||img.height;
+  const x = c.getContext('2d'); x.drawImage(img,0,0);
+  const d = x.getImageData(0,0,c.width,c.height).data;
+  let minX=c.width,minY=c.height,maxX=0,maxY=0,found=false;
+  for(let y=0;y<c.height;y++)for(let px=0;px<c.width;px++){
+    if(d[(y*c.width+px)*4+3]>8){found=true;
+      if(px<minX)minX=px; if(px>maxX)maxX=px; if(y<minY)minY=y; if(y>maxY)maxY=y;}
+  }
+  if(!found) return c;
+  const w=maxX-minX+1, h=maxY-minY+1;
+  const o=document.createElement('canvas'); o.width=w; o.height=h;
+  o.getContext('2d').drawImage(c,minX,minY,w,h,0,0,w,h);
+  return o;
+}
+
+// draw a source image centered on canvas of `size`; longest side = size*resize/100
+function drawFitted(ctx, src, size, resizePct, trim){
+  if(!src) return;
+  const s = trim ? trimmed(src) : src;
+  const sw = s.width||s.naturalWidth, sh = s.height||s.naturalHeight;
+  const target = size * resizePct/100;
+  const scale = target / Math.max(sw,sh);
+  const w = sw*scale, h = sh*scale;
+  ctx.imageSmoothingQuality='high';
+  ctx.drawImage(s, (size-w)/2, (size-h)/2, w, h);
+}
+// ---- layer renderers (each returns a canvas of the given px size) ----
+function makeCanvas(size){const c=document.createElement('canvas');c.width=c.height=size;return c;}
+
+function renderForeground(size){
+  const c=makeCanvas(size);
+  drawFitted(c.getContext('2d'), state.fg.img, size, state.fg.resize, state.fg.trim);
+  return c;
+}
+
+function renderBackground(size){
+  const c=makeCanvas(size); const x=c.getContext('2d');
+  if(state.bg.type==='color'){ x.fillStyle=state.bg.color; x.fillRect(0,0,size,size); }
+  else { drawFitted(x, state.bg.img, size, state.bg.resize, false); }
+  return c;
+}
+
+// adaptive composite = background + foreground (full 108dp canvas)
+function renderComposite(size){
+  const c=makeCanvas(size); const x=c.getContext('2d');
+  x.drawImage(renderBackground(size),0,0);
+  x.drawImage(renderForeground(size),0,0);
+  return c;
+}
+
+function renderMono(size){
+  const c=makeCanvas(size); const x=c.getContext('2d');
+  if(state.mono.mode==='off') return null;
+  if(state.mono.mode==='image'){
+    drawFitted(x, state.mono.img, size, state.mono.resize, false);
+  } else {
+    // auto: silhouette of the foreground, keep alpha, force RGB black
+    const src = state.fg.img;
+    const tmp = makeCanvas(size);
+    drawFitted(tmp.getContext('2d'), src, size, state.mono.resize, state.fg.trim);
+    const id = tmp.getContext('2d').getImageData(0,0,size,size);
+    const d=id.data;
+    for(let i=0;i<d.length;i+=4){ d[i]=0; d[i+1]=0; d[i+2]=0; }
+    x.putImageData(id,0,0);
+  }
+  return c;
+}
+
+// rounded-rect path
+function rrect(x,s,r){x.moveTo(r,0);x.arcTo(s,0,s,s,r);x.arcTo(s,s,0,s,r);x.arcTo(0,s,0,0,r);x.arcTo(0,0,s,0,r);x.closePath();}
+
+// mask a composite to a legacy shape at the given output size
+function renderLegacy(size, shape){
+  // legacy shows the central 72dp viewport of the 108dp composite
+  const render = Math.round(size * (1/VIEW_RATIO));      // composite size so viewport==size
+  const comp = renderComposite(render);
+  const crop = (render - size)/2;
+  const c=makeCanvas(size); const x=c.getContext('2d');
+  x.save();
+  x.beginPath();
+  if(shape==='circle'){ x.arc(size/2,size/2,size/2,0,Math.PI*2); }
+  else if(shape==='squircle'){ rrect(x,size,size*0.24); }
+  else { rrect(x,size,size*0.16); }               // rounded square
+  x.clip();
+  x.drawImage(comp, crop, crop, size, size, 0, 0, size, size);
+  x.restore();
+  return c;
+}
+
+function renderPlaystore(){ return renderComposite(PLAYSTORE); }
+// ---- preview ----
+function blit(id, srcCanvas, dispSafe){
+  const cv=$(id); const size=180; cv.width=cv.height=size;
+  const x=cv.getContext('2d'); x.clearRect(0,0,size,size);
+  if(srcCanvas) x.drawImage(srcCanvas,0,0,srcCanvas.width,srcCanvas.height,0,0,size,size);
+  if(dispSafe){ // draw safe-zone circle overlay
+    x.save(); x.strokeStyle='rgba(255,255,255,.35)'; x.setLineDash([5,4]);
+    x.beginPath(); x.arc(size/2,size/2,size*SAFE_RATIO/2,0,Math.PI*2); x.stroke(); x.restore();
+  }
+}
+
+function updatePreview(){
+  const d = $('#pvDensity').value;
+  const aSize = ADAPTIVE[d];
+  const comp = renderComposite(aSize);
+  // rounded square (masked composite)
+  blit('#cvRound', renderLegacy(aSize,'square'));
+  blit('#cvSquare', renderLegacy(aSize,'circle'));
+  blit('#cvBleed', comp, true);
+  blit('#cvBig', renderPlaystore());
+  const lSize = LEGACY[d];
+  blit('#cvLegacy', renderLegacy(lSize, state.legShape));
+  blit('#cvLegacyR', renderLegacy(lSize,'circle'));
+  const m = renderMono(aSize);
+  if(m){ // show mono on a mid-grey so black silhouette is visible
+    const bg=makeCanvas(aSize); const bx=bg.getContext('2d');
+    bx.fillStyle='#7a7f87'; bx.fillRect(0,0,aSize,aSize); bx.drawImage(m,0,0);
+    blit('#cvMono', bg);
+  } else blit('#cvMono', null);
+}
+
+function toWebp(canvas){return new Promise(r=>canvas.toBlob(r,'image/webp',state.quality/100));}
+function toPng(canvas){return new Promise(r=>canvas.toBlob(r,'image/png'));}
+
+// ---- build all output files -> [{path,blob}] relative to app/src/main/ ----
+async function buildFiles(){
+  const files=[]; const name=state.name;
+  const monoOn = state.mono.mode!=='off';
+  const bgImage = state.bg.type==='image';
+  for(const d of DENSITIES){
+    const a=ADAPTIVE[d], l=LEGACY[d];
+    const dir=`res/mipmap-${d}/`;
+    files.push({path:`${dir}${name}.webp`,        blob:await toWebp(renderLegacy(l,state.legShape))});
+    files.push({path:`${dir}${name}_round.webp`,  blob:await toWebp(renderLegacy(l,'circle'))});
+    files.push({path:`${dir}${name}_foreground.webp`, blob:await toWebp(renderForeground(a))});
+    if(monoOn) files.push({path:`${dir}${name}_monochrome.webp`, blob:await toWebp(renderMono(a))});
+    if(bgImage) files.push({path:`${dir}${name}_background.webp`, blob:await toWebp(renderBackground(a))});
+  }
+  // adaptive xml
+  const bgRef = bgImage ? `@mipmap/${name}_background` : `@color/${name}_background`;
+  const monoLine = monoOn ? `\n    <monochrome android:drawable="@mipmap/${name}_monochrome"/>` : '';
+  const xml =
+`<?xml version="1.0" encoding="utf-8"?>
+<adaptive-icon xmlns:android="http://schemas.android.com/apk/res/android">
+    <background android:drawable="${bgRef}"/>
+    <foreground android:drawable="@mipmap/${name}_foreground"/>${monoLine}
+</adaptive-icon>`;
+  files.push({path:`res/mipmap-anydpi-v26/${name}.xml`, blob:new Blob([xml],{type:'text/xml'})});
+  files.push({path:`res/mipmap-anydpi-v26/${name}_round.xml`, blob:new Blob([xml],{type:'text/xml'})});
+  if(!bgImage){
+    const col=
+`<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <color name="${name}_background">${state.bg.color.toUpperCase()}</color>
+</resources>`;
+    files.push({path:`res/values/${name}_background.xml`, blob:new Blob([col],{type:'text/xml'})});
+  }
+  files.push({path:`${name}-playstore.png`, blob:await toPng(renderPlaystore())});
+  return files;
+}
+// ---- exports ----
+function setStatus(msg,cls){const s=$('#status');s.textContent=msg;s.className='status '+(cls||'');}
+
+async function exportZip(){
+  if(!ready()) return;
+  setStatus('Rendering…');
+  const files=await buildFiles();
+  const zip=new JSZip();
+  files.forEach(f=>zip.file(f.path,f.blob));
+  const blob=await zip.generateAsync({type:'blob'});
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=`${state.name}-icons.zip`; a.click();
+  setStatus(`ZIP ready — extract into app/src/main/ (${files.length} files).`,'ok');
+}
+
+// remember the chosen folder handle across clicks/sessions (IndexedDB)
+let dirHandle=null;
+function idbReq(mode,fn){return new Promise((res,rej)=>{const r=indexedDB.open('iconGen',1);
+  r.onupgradeneeded=()=>r.result.createObjectStore('h');
+  r.onsuccess=()=>{const tx=r.result.transaction('h',mode);const o=tx.objectStore('h');const q=fn(o);
+    tx.oncomplete=()=>res(q&&q.result);tx.onerror=()=>rej(tx.error);};
+  r.onerror=()=>rej(r.error);});}
+const idbGet=k=>idbReq('readonly',o=>o.get(k));
+const idbSet=(k,v)=>idbReq('readwrite',o=>o.put(v,k));
+const idbDel=k=>idbReq('readwrite',o=>o.delete(k));
+
+async function verifyPerm(h){const opt={mode:'readwrite'};
+  if(!h) return false;
+  if((await h.queryPermission(opt))==='granted') return true;
+  if((await h.requestPermission(opt))==='granted') return true;
+  return false;}
+
+async function getDir(forcePick){
+  if(!forcePick){
+    if(!dirHandle){ try{ dirHandle=await idbGet('dir'); }catch(e){} }
+    if(dirHandle && await verifyPerm(dirHandle)) return dirHandle;
+  }
+  const h=await window.showDirectoryPicker({mode:'readwrite'});
+  dirHandle=h; try{ await idbSet('dir',h); }catch(e){}
+  return h;
+}
+
+async function showRemembered(){
+  try{ const h=await idbGet('dir'); if(h){ dirHandle=h;
+    $('#dirInfo').innerHTML=`remembered folder: <b>${h.name}</b> · <a href="#" id="chgDir">change</a>`;
+    $('#chgDir').onclick=async ev=>{ev.preventDefault();await idbDel('dir');dirHandle=null;$('#dirInfo').textContent='';};
+  }}catch(e){}
+}
+
+async function exportDir(){
+  if(!ready()) return;
+  if(!window.showDirectoryPicker){ setStatus('Direct write needs Chrome/Edge over http(s)://localhost. Use the ZIP instead.','warn'); return; }
+  let root;
+  try{ root=await getDir(false); }catch(e){ if(e&&e.name!=='AbortError') setStatus('Could not open folder: '+e.message,'warn'); return; }
+  setStatus('Rendering…');
+  const files=await buildFiles();
+  // Map paths depending on which folder was picked:
+  //  - "main"     -> res/* and *-playstore.png land exactly right
+  //  - "res"      -> strip res/, playstore is written inside res (note to move it)
+  //  - other name -> written as-is under the picked folder
+  const picked=root.name; let note='';
+  for(const f of files){
+    let path=f.path, base=root;
+    if(picked==='res' && path.startsWith('res/')) path=path.slice(4);
+    if(picked==='res' && !path.includes('/') && path.endsWith('-playstore.png')) note=` Move ${path} up into main/.`;
+    const parts=path.split('/'); const fname=parts.pop();
+    for(const p of parts){ base=await base.getDirectoryHandle(p,{create:true}); }
+    const fh=await base.getFileHandle(fname,{create:true});
+    const w=await fh.createWritable(); await w.write(f.blob); await w.close();
+  }
+  await showRemembered();
+  setStatus(`✔ Wrote ${files.length} files into /${picked}. Sync/rebuild in Android Studio to see them.${note}`,'ok');
+}
+
+async function exportPlay(){
+  if(!ready()) return;
+  const blob=await toPng(renderPlaystore());
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(blob); a.download=`${state.name}-playstore.png`; a.click();
+}
+
+function ready(){
+  if(!state.fg.img){ setStatus('Pick a foreground image first.','warn'); return false; }
+  if(state.bg.type==='image' && !state.bg.img){ setStatus('Pick a background image or switch to Color.','warn'); return false; }
+  if(state.mono.mode==='image' && !state.mono.img){ setStatus('Pick a monochrome image or switch source.','warn'); return false; }
+  return true;
+}
+// ---- UI wiring ----
+function segGroup(sel, fn){
+  $$(sel+' button').forEach(b=>b.onclick=()=>{
+    b.parentElement.querySelectorAll('button').forEach(x=>x.classList.remove('active'));
+    b.classList.add('active'); fn(b.dataset.v); updatePreview();
+  });
+}
+// tabs
+$$('.tabs button').forEach(b=>b.onclick=()=>{
+  $$('.tabs button').forEach(x=>x.classList.remove('active')); b.classList.add('active');
+  $$('.pane').forEach(p=>p.classList.remove('active'));
+  $('#pane-'+b.dataset.tab).classList.add('active');
+});
+// foreground
+$('#fgFile').onchange=async e=>{ if(e.target.files[0]){ state.fg.img=await loadImage(e.target.files[0]); updatePreview(); }};
+segGroup('#fgTrim', v=>state.fg.trim=v==='1');
+$('#fgResize').oninput=e=>{state.fg.resize=+e.target.value;$('#fgResizeV').textContent=e.target.value+'%';updatePreview();};
+// background
+segGroup('#bgType', v=>{ state.bg.type=v;
+  $('#bgColorRow').style.display=v==='color'?'flex':'none';
+  $('#bgImgRow').style.display=v==='image'?'flex':'none';
+  $('#bgResizeRow').style.display=v==='image'?'flex':'none';
+});
+$('#bgColor').oninput=e=>{state.bg.color=e.target.value;$('#bgColorHex').value=e.target.value.toUpperCase();updatePreview();};
+$('#bgColorHex').oninput=e=>{let v=e.target.value.trim();if(!v.startsWith('#'))v='#'+v;if(/^#[0-9a-fA-F]{6}$/.test(v)){state.bg.color=v;$('#bgColor').value=v;updatePreview();}};
+$('#bgFile').onchange=async e=>{ if(e.target.files[0]){ state.bg.img=await loadImage(e.target.files[0]); updatePreview(); }};
+$('#bgResize').oninput=e=>{state.bg.resize=+e.target.value;$('#bgResizeV').textContent=e.target.value+'%';updatePreview();};
+// mono
+segGroup('#monoMode', v=>{ state.mono.mode=v;
+  $('#monoImgRow').style.display=v==='image'?'flex':'none';
+  $('#monoResizeRow').style.display=v==='off'?'none':'flex';
+});
+$('#monoFile').onchange=async e=>{ if(e.target.files[0]){ state.mono.img=await loadImage(e.target.files[0]); updatePreview(); }};
+$('#monoResize').oninput=e=>{state.mono.resize=+e.target.value;$('#monoResizeV').textContent=e.target.value+'%';updatePreview();};
+// options
+$('#iconName').oninput=e=>state.name=e.target.value.trim()||'ic_launcher';
+segGroup('#legShape', v=>state.legShape=v);
+$('#quality').oninput=e=>{state.quality=+e.target.value;$('#qualityV').textContent=e.target.value;};
+$('#pvDensity').onchange=updatePreview;
+// export buttons
+$('#btnZip').onclick=exportZip;
+$('#btnDir').onclick=exportDir;
+$('#btnPlay').onclick=exportPlay;
+updatePreview();
+showRemembered();
+
+</script>
+</body>
+</html>

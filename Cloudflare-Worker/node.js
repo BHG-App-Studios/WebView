@@ -116,6 +116,14 @@ export default {
           await persistGeneratedKeystore(body, packageName, uid, env);
         }
 
+        // Custom app icon (optional). The app ships the whole res/ icon set as a
+        // base64 ZIP; we stash it in R2 and hand the runner a secret-gated fetch
+        // URL. Bytes never touch the logged dispatch payload.
+        const icon = await stageIconZip(body, buildId, uid, env);
+        if (icon.error) {
+          return jsonResponse({ error: icon.error }, 400, corsHeaders);
+        }
+
         // Customisation: every AppConfig.kt constant
         const resolved = resolveOptions(body);
         if (resolved.error) {
@@ -166,6 +174,12 @@ export default {
           VERSION_CODE: version.versionCode,         // positive integer
           VERSION_NAME: version.versionName          // e.g. "1.0"
         };
+
+        // Custom launcher icon: only present when the app sent one. Secret-gated
+        // like signing; the runner fetches + unzips it over app/src/main/.
+        if (icon.staged) {
+          buildConfig.ICON_FETCH_URL = `${url.origin}/api/icons/${buildId}?uid=${uidParam}`;
+        }
 
         let ghDispatched = false;
         let ghMessage = "GitHub Actions not configured yet. Build metadata created.";
@@ -336,6 +350,33 @@ export default {
         }
 
         return jsonResponse(bundle, 200, corsHeaders);
+      }
+
+      // ----------------------------------------------------
+      // 2c-icons. RUNNER FETCHES CUSTOM ICON ZIP: GET /api/icons/:buildId
+      //     Secret-gated, mirrors /api/signing. Returns the raw ZIP the app
+      //     generated (res/ icon set) so the runner can unzip it over
+      //     app/src/main/. Never public; only present when the app sent one.
+      // ----------------------------------------------------
+      if (method === "GET" && path.startsWith("/api/icons/")) {
+        const authKey = request.headers.get("X-Build-Secret") || url.searchParams.get("secret");
+        if (!env.BUILD_SECRET || authKey !== env.BUILD_SECRET) {
+          return jsonResponse({ error: "Unauthorized" }, 401, corsHeaders);
+        }
+        const buildId = path.replace("/api/icons/", "").trim();
+        const uid = url.searchParams.get("uid");
+        if (!uid) return jsonResponse({ error: "uid required" }, 400, corsHeaders);
+
+        const obj = await env.BUCKET.get(`${uid}/icons/${buildId}/icons.zip`);
+        if (!obj) return jsonResponse({ error: "No custom icon for this build" }, 404, corsHeaders);
+        return new Response(obj.body, {
+          status: 200,
+          headers: {
+            ...corsHeaders,
+            "Content-Type": "application/zip",
+            "Content-Disposition": `attachment; filename="icons.zip"`
+          }
+        });
       }
 
       // ----------------------------------------------------
@@ -1083,6 +1124,33 @@ function validateCustomKeystore(body) {
   };
 }
 
+/**
+ * Custom app icon. The app generates the whole res/ icon set natively (adaptive
+ * layers, legacy mipmaps, auto monochrome) and sends it as a base64 ZIP in the
+ * build-request body. Like the keystore, the bytes never ride in the GitHub
+ * dispatch payload (which is logged): we stash the ZIP in R2 and the runner
+ * fetches it from a secret-gated URL, then unzips it into app/src/main/.
+ *
+ * icon_zip_b64 is OPTIONAL - most builds keep the template's default launcher.
+ * Returns { staged: false } when absent, { error } when malformed, or
+ * { staged: true } once the ZIP is stored at {uid}/icons/{buildId}/icons.zip.
+ */
+async function stageIconZip(body, buildId, uid, env) {
+  const b64 = typeof body.icon_zip_b64 === "string" ? body.icon_zip_b64.trim() : "";
+  if (!b64) return { staged: false };
+  // The full res/ icon set (a handful of small WEBPs + tiny XML) is well under
+  // a megabyte; reject anything suspiciously large before touching R2.
+  if (b64.length > 8 * 1024 * 1024) return { error: "Icon package is too large" };
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(b64)) return { error: "Icon package must be base64-encoded" };
+
+  const bytes = Uint8Array.from(atob(b64.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+  await env.BUCKET.put(`${uid}/icons/${buildId}/icons.zip`, bytes, {
+    httpMetadata: { contentType: "application/zip" },
+    customMetadata: { uploadedAt: new Date().toISOString() }
+  });
+  return { staged: true };
+}
+
 // --------------------------------------------------------
 // GitHub Actions Workflow Trigger
 // --------------------------------------------------------
@@ -1131,7 +1199,10 @@ async function triggerGitHubAction(env, buildConfig) {
           signing_mode: buildConfig.SIGNING_MODE,
           signing_fetch_url: buildConfig.SIGNING_FETCH_URL,
           version_code: buildConfig.VERSION_CODE,
-          version_name: buildConfig.VERSION_NAME
+          version_name: buildConfig.VERSION_NAME,
+          // Optional; empty string when the build keeps the template's default
+          // launcher. Nested here so it doesn't count toward the 10-key cap.
+          icon_fetch_url: buildConfig.ICON_FETCH_URL || ""
         }
       }
     })

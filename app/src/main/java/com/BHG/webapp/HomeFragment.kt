@@ -373,6 +373,7 @@ class HomeFragment : Fragment() {
                 if (buildType == "release") R.string.build_type_release_helper
                 else R.string.build_type_debug_helper
             )
+            applySigningLockForBuildType(b)
         }
 
         b.outputToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -403,6 +404,36 @@ class HomeFragment : Fragment() {
         b.createKeystoreButton.setOnClickListener {
             KeystoreCreateSheet().show(parentFragmentManager, KeystoreCreateSheet.TAG)
         }
+
+        // Debug is the initial build type, so lock signing to auto up front.
+        applySigningLockForBuildType(b)
+    }
+
+    /**
+     * Debug builds are always auto-signed with a throwaway test key, so the
+     * signing choice is locked to Auto-generate and the toggle is disabled.
+     * Release builds unlock the toggle so the user can pick their own keystore.
+     */
+    private fun applySigningLockForBuildType(b: StepSigningBinding) {
+        val debug = buildType == "debug"
+        if (debug) {
+            // Force Auto and clear any custom keystore the user may have picked
+            // before switching back to Debug.
+            if (signingMode != "auto") clearKeystoreSelection()
+            signingMode = "auto"
+            b.signingToggle.check(b.signingAuto.id)
+            b.customKeystoreSection.visibility = View.GONE
+            b.signingHelper.setText(R.string.signing_debug_locked_helper)
+        } else {
+            val custom = signingMode == "custom"
+            b.customKeystoreSection.visibility = if (custom) View.VISIBLE else View.GONE
+            b.signingHelper.setText(
+                if (custom) R.string.signing_custom_helper else R.string.signing_auto_helper
+            )
+        }
+        // A disabled toggle keeps Auto selected but stops the user from changing it.
+        b.signingAuto.isEnabled = !debug
+        b.signingCustom.isEnabled = !debug
     }
 
     /** Applies a keystore generated on-device by [KeystoreCreateSheet]. */
@@ -853,6 +884,7 @@ class HomeFragment : Fragment() {
             b.customKeystoreSection.visibility = View.GONE
             b.keystoreFileName.visibility = View.GONE
             b.storePwInput.text?.clear(); b.keyAliasInput.text?.clear(); b.keyPwInput.text?.clear()
+            applySigningLockForBuildType(b)
         }
         (activity as? MainActivity)?.setBottomNavVisible(true, animate = false)
     }

@@ -79,10 +79,11 @@
     <string name="output_format_helper">APK installs directly. AAB is required to publish a new app on Google Play.</string>
     <string name="label_signing">Signing key</string>
     <string name="signing_auto">Auto-generate</string>
-    <string name="signing_custom">Upload keystore</string>
+    <string name="signing_custom">Custom keystore</string>
     <string name="signing_auto_helper">We create a keystore for you and keep it so future updates use the same key. You can download it after the build.</string>
-    <string name="signing_custom_helper">Sign with your own keystore. You will need the store password, key alias and key password.</string>
-    <string name="keystore_pick">Choose keystore file (.jks / .keystore)</string>
+    <string name="signing_custom_helper">Sign with your own keystore — create a new one on-device or upload an existing .jks / .keystore.</string>
+    <string name="signing_debug_locked_helper">Debug builds are always auto-signed with a test key — no keystore needed. Switch to Release to sign with your own key.</string>
+    <string name="keystore_pick">Upload keystore (.jks / .keystore)</string>
     <string name="keystore_store_password">Store password</string>
     <string name="keystore_key_alias">Key alias</string>
     <string name="keystore_key_password">Key password</string>

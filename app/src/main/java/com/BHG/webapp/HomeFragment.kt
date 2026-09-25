@@ -431,9 +431,11 @@ class HomeFragment : Fragment() {
                 if (custom) R.string.signing_custom_helper else R.string.signing_auto_helper
             )
         }
-        // A disabled toggle keeps Auto selected but stops the user from changing it.
+        // A disabled toggle keeps Auto selected but stops the user from changing it;
+        // dim the whole group so the locked state reads clearly on Debug.
         b.signingAuto.isEnabled = !debug
         b.signingCustom.isEnabled = !debug
+        b.signingToggle.alpha = if (debug) 0.5f else 1f
     }
 
     /** Applies a keystore generated on-device by [KeystoreCreateSheet]. */

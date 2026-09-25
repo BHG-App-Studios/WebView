@@ -3,7 +3,6 @@ package com.BHG.webapp
 import android.content.res.ColorStateList
 import android.graphics.Bitmap
 import android.graphics.Color
-import android.graphics.drawable.GradientDrawable
 import android.net.Uri
 import android.os.Bundle
 import android.os.Handler
@@ -46,11 +45,6 @@ class LogoCreateFragment : DialogFragment() {
     private var fgResize = 69
     private var bgResize = 100
     private var busy = false
-
-    private val presets = listOf(
-        "#FAFAFA", "#FFFFFF", "#111318", "#3574F0", "#00BFFF",
-        "#4CAF50", "#F44336", "#FF9800", "#9C27B0", "#607D8B"
-    )
 
     private lateinit var pickFg: ActivityResultLauncher<String>
     private lateinit var pickBg: ActivityResultLauncher<String>
@@ -105,7 +99,6 @@ class LogoCreateFragment : DialogFragment() {
         // The swatch and the field's trailing icon both open the real picker.
         b.bgColorSwatchCard.setOnClickListener { openColorPicker() }
         b.bgColorHexLayout.setEndIconOnClickListener { openColorPicker() }
-        buildSwatches()
 
         b.useLogoButton.setOnClickListener { onUse() }
         b.removeLogoButton.setOnClickListener { sendRemoved() }
@@ -140,24 +133,6 @@ class LogoCreateFragment : DialogFragment() {
         b.bgColorHexInput.setText(hexStr.uppercase())
         b.bgColorHexInput.setSelection(b.bgColorHexInput.text?.length ?: 0)
         refresh()
-    }
-
-    private fun buildSwatches() {
-        val ctx = requireContext()
-        val size = dp(34)
-        val margin = dp(6)
-        for (hexStr in presets) {
-            val v = View(ctx)
-            val lp = LinearLayout.LayoutParams(size, size).apply { marginEnd = margin }
-            v.layoutParams = lp
-            v.background = GradientDrawable().apply {
-                shape = GradientDrawable.OVAL
-                setColor(Color.parseColor(hexStr))
-                setStroke(dp(1), 0x33000000)
-            }
-            v.setOnClickListener { setColor(hexStr) }
-            b.bgSwatchRow.addView(v)
-        }
     }
 
     private fun dp(v: Int): Int = TypedValue.applyDimension(

@@ -243,4 +243,31 @@
     <string name="rate_us">Rate this app</string>
     <string name="sign_out">Sign out</string>
     <string name="drawer_version">Version 1.0</string>
+
+    <!-- App logo / icon creator -->
+    <string name="logo_card_title">App logo</string>
+    <string name="logo_card_subtitle">Optional. Design a custom launcher icon for your app.</string>
+    <string name="logo_create">Create logo</string>
+    <string name="logo_edit">Edit logo</string>
+    <string name="logo_added">Custom logo added</string>
+    <string name="logo_title">Create app logo</string>
+    <string name="logo_subtitle">Pick a foreground image, choose a background, and preview your adaptive icon. The monochrome (themed) icon is generated automatically.</string>
+    <string name="logo_section_foreground">Foreground</string>
+    <string name="logo_section_background">Background</string>
+    <string name="logo_pick_foreground">Choose foreground image</string>
+    <string name="logo_pick_background">Choose background image</string>
+    <string name="logo_change_image">Change image</string>
+    <string name="logo_foreground_size">Foreground size</string>
+    <string name="logo_background_size">Background image size</string>
+    <string name="logo_bg_type_color">Color</string>
+    <string name="logo_bg_type_image">Image</string>
+    <string name="logo_bg_color">Background color</string>
+    <string name="logo_preview">Preview</string>
+    <string name="logo_use">Use this logo</string>
+    <string name="logo_remove">Remove logo</string>
+    <string name="logo_need_foreground">Choose a foreground image first</string>
+    <string name="logo_need_background">Choose a background image or switch to Color</string>
+    <string name="logo_generating">Preparing icon…</string>
+    <string name="logo_failed">Could not create the icon. Please try again.</string>
+    <string name="logo_close">Close</string>
 </resources>

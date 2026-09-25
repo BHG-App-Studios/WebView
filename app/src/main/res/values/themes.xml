@@ -238,4 +238,12 @@
         <item name="android:background">@android:color/transparent</item>
         <item name="backgroundTint">@android:color/transparent</item>
     </style>
+
+    <!-- Full-screen dialog used by the logo creator. -->
+    <style name="Theme.WebsiteAppBuilder.FullScreenDialog" parent="Theme.WebsiteAppBuilder">
+        <item name="android:windowIsFloating">false</item>
+        <item name="android:windowBackground">?attr/colorSurface</item>
+        <item name="android:statusBarColor">?attr/colorSurface</item>
+        <item name="android:navigationBarColor">@color/nav_bar_bg</item>
+    </style>
 </resources>

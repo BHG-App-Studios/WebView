@@ -85,6 +85,12 @@ class HomeFragment : Fragment() {
     // so the build can ask the Worker to persist it to {uid}/keystores/{package}.
     private var customKeystoreGenerated = false
 
+    // Custom app logo built on-device by LogoCreateFragment. The generated res/
+    // icon ZIP is cached to disk; its bytes are base64'd into the build request
+    // at dispatch time so the runner can drop them into the project.
+    private var logoZipPath: String? = null
+    private var logoPreviewPath: String? = null
+
     /** The URL the app name + package fields were last auto-derived from. */
     private var namesDerivedForUrl: String? = null
 
@@ -147,6 +153,11 @@ class HomeFragment : Fragment() {
         parentFragmentManager.setFragmentResultListener(
             KeystoreCreateSheet.RESULT_KEY, this
         ) { _, bundle -> onKeystoreGenerated(bundle) }
+
+        // Receive the app logo built on-device by the logo creator.
+        parentFragmentManager.setFragmentResultListener(
+            LogoCreateFragment.RESULT_KEY, this
+        ) { _, bundle -> onLogoResult(bundle) }
     }
 
     override fun onCreateView(
@@ -298,6 +309,8 @@ class HomeFragment : Fragment() {
                     // If the URL was already confirmed before this page existed,
                     // fill in the derived app name + package now.
                     if (confirmedUrl.isNotEmpty()) prefillNamesFromUrl()
+                    b.logoCreateButton.setOnClickListener { openLogoCreator() }
+                    updateLogoCard(b)
                     StepVH(b.root)
                 }
                 STEP_FEATURES -> {
@@ -489,6 +502,55 @@ class HomeFragment : Fragment() {
         stepSigningBinding?.keystoreFileName?.let {
             it.text = ""
             it.visibility = View.GONE
+        }
+    }
+
+    // =========================================================================
+    //  App logo (custom launcher icon)
+    // =========================================================================
+
+    private fun openLogoCreator() {
+        LogoCreateFragment.newInstance(editing = logoZipPath != null)
+            .show(parentFragmentManager, LogoCreateFragment.TAG)
+    }
+
+    private fun onLogoResult(bundle: Bundle) {
+        if (bundle.getBoolean(LogoCreateFragment.ARG_REMOVED, false)) {
+            clearLogoSelection()
+        } else {
+            logoZipPath = bundle.getString(LogoCreateFragment.ARG_ZIP_PATH)
+            logoPreviewPath = bundle.getString(LogoCreateFragment.ARG_PREVIEW_PATH)
+        }
+        stepWebsiteBinding?.let { updateLogoCard(it) }
+    }
+
+    private fun clearLogoSelection() {
+        logoZipPath?.let { runCatching { java.io.File(it).delete() } }
+        logoPreviewPath?.let { runCatching { java.io.File(it).delete() } }
+        logoZipPath = null
+        logoPreviewPath = null
+    }
+
+    /** Reflects whether a custom logo is set on the Step 1 card. */
+    private fun updateLogoCard(b: StepWebsiteBinding) {
+        val hasLogo = logoZipPath != null
+        if (hasLogo) {
+            val preview = logoPreviewPath?.let { android.graphics.BitmapFactory.decodeFile(it) }
+            if (preview != null) {
+                b.logoPreview.setImageBitmap(preview)
+                b.logoPreview.visibility = View.VISIBLE
+                b.logoIcon.visibility = View.GONE
+                b.logoIconBg.visibility = View.GONE
+            }
+            b.logoSubtitle.setText(R.string.logo_added)
+            b.logoCreateButton.setText(R.string.logo_edit)
+        } else {
+            b.logoPreview.setImageDrawable(null)
+            b.logoPreview.visibility = View.GONE
+            b.logoIcon.visibility = View.VISIBLE
+            b.logoIconBg.visibility = View.VISIBLE
+            b.logoSubtitle.setText(R.string.logo_card_subtitle)
+            b.logoCreateButton.setText(R.string.logo_create)
         }
     }
 
@@ -852,6 +914,16 @@ class HomeFragment : Fragment() {
             // builds of this package sign with the same key.
             if (customKeystoreGenerated) json.put("save_to_keystores", true)
         }
+
+        // Custom launcher icon: the generated res/ ZIP travels to the Worker as
+        // base64 (over HTTPS, never in the dispatch payload the runner logs). The
+        // Worker stores it and hands the runner an icons_fetch_url to extract.
+        logoZipPath?.let { path ->
+            runCatching {
+                val bytes = java.io.File(path).readBytes()
+                json.put("icon_zip_b64", Base64.encodeToString(bytes, Base64.NO_WRAP))
+            }
+        }
         return json
     }
 
@@ -875,6 +947,8 @@ class HomeFragment : Fragment() {
         stepWebsiteBinding?.versionNameInput?.text?.clear()
         stepWebsiteBinding?.versionCodeInput?.text?.clear()
         stepWebsiteBinding?.versionCodeLayout?.error = null
+        clearLogoSelection()
+        stepWebsiteBinding?.let { updateLogoCard(it) }
         // Reset signing selections back to the defaults for the next build.
         buildType = "debug"; signingMode = "auto"; outputFormat = "apk"
         clearKeystoreSelection()

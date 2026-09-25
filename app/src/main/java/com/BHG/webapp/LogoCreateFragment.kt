@@ -73,6 +73,7 @@ class LogoCreateFragment : DialogFragment() {
         super.onViewCreated(view, savedInstanceState)
         loadDefaultImages()
         b.logoClose.setOnClickListener { if (!busy) dismiss() }
+        b.logoReset.setOnClickListener { if (!busy) resetToDefaults() }
         b.fgPickButton.setOnClickListener { pickFg.launch("image/*") }
         b.bgPickButton.setOnClickListener { pickBg.launch("image/*") }
 
@@ -145,6 +146,27 @@ class LogoCreateFragment : DialogFragment() {
     private fun applyBgType() {
         b.bgColorRow.visibility = if (bgIsColor) View.VISIBLE else View.GONE
         b.bgImageRow.visibility = if (bgIsColor) View.GONE else View.VISIBLE
+    }
+
+    /** Toolbar reset: restore the bundled default images and all default settings. */
+    private fun resetToDefaults() {
+        fg = null
+        bgImg = null
+        bgIsColor = true
+        bgColor = Color.parseColor("#FAFAFA")
+        fgResize = 69
+        bgResize = 100
+        fgRotation = 0
+        loadDefaultImages()   // repopulates fg/bg from defaults, sets bgIsColor=false
+
+        b.fgSizeSlider.value = fgResize.toFloat(); b.fgSizeValue.text = pct(fgResize)
+        b.bgSizeSlider.value = bgResize.toFloat(); b.bgSizeValue.text = pct(bgResize)
+        b.fgRotationSlider.value = fgRotation.toFloat(); b.fgRotationValue.text = deg(fgRotation)
+        b.bgColorHexInput.setText(hex(bgColor))
+        b.bgTypeToggle.check(if (bgIsColor) b.bgTypeColor.id else b.bgTypeImage.id)
+        applyBgType()
+        refresh()
+        Toast.makeText(requireContext(), R.string.logo_reset_done, Toast.LENGTH_SHORT).show()
     }
 
     private fun parseHex(raw: String?) {
@@ -312,6 +334,8 @@ class LogoCreateFragment : DialogFragment() {
                         .compress(Bitmap.CompressFormat.PNG, 100, os)
                 }
 
+                // Hand HomeFragment the freshly built files for this build. Nothing
+                // is persisted — the selection lives only for the current session.
                 main.post {
                     if (_b == null) return@post
                     parentFragmentManager.setFragmentResult(
@@ -358,9 +382,10 @@ class LogoCreateFragment : DialogFragment() {
         const val ARG_PREVIEW_PATH = "preview_path"
         const val ARG_REMOVED = "removed"
         const val ARG_EDITING = "editing"
+        const val ARG_URL = "url"
 
-        fun newInstance(editing: Boolean): LogoCreateFragment =
-            LogoCreateFragment().apply { arguments = bundleOf(ARG_EDITING to editing) }
+        fun newInstance(editing: Boolean, url: String): LogoCreateFragment =
+            LogoCreateFragment().apply { arguments = bundleOf(ARG_EDITING to editing, ARG_URL to url) }
     }
 }
 

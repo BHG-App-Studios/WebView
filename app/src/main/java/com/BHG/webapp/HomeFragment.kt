@@ -510,7 +510,7 @@ class HomeFragment : Fragment() {
     // =========================================================================
 
     private fun openLogoCreator() {
-        LogoCreateFragment.newInstance(editing = logoZipPath != null)
+        LogoCreateFragment.newInstance(editing = logoZipPath != null, url = confirmedUrl)
             .show(parentFragmentManager, LogoCreateFragment.TAG)
     }
 
@@ -518,15 +518,16 @@ class HomeFragment : Fragment() {
         if (bundle.getBoolean(LogoCreateFragment.ARG_REMOVED, false)) {
             clearLogoSelection()
         } else {
+            // Adopt the freshly created ZIP + preview for this build only. Nothing
+            // is written to disk, so the selection lives just for this session.
             logoZipPath = bundle.getString(LogoCreateFragment.ARG_ZIP_PATH)
             logoPreviewPath = bundle.getString(LogoCreateFragment.ARG_PREVIEW_PATH)
         }
         stepWebsiteBinding?.let { updateLogoCard(it) }
     }
 
+    /** Clears the current logo selection. */
     private fun clearLogoSelection() {
-        logoZipPath?.let { runCatching { java.io.File(it).delete() } }
-        logoPreviewPath?.let { runCatching { java.io.File(it).delete() } }
         logoZipPath = null
         logoPreviewPath = null
     }

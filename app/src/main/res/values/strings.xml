@@ -275,4 +275,6 @@
     <string name="logo_generating">Preparing icon…</string>
     <string name="logo_failed">Could not create the icon. Please try again.</string>
     <string name="logo_close">Close</string>
+    <string name="logo_reset">Reset to default</string>
+    <string name="logo_reset_done">Reset to default</string>
 </resources>

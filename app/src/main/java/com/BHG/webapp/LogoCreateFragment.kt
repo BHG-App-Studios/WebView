@@ -71,6 +71,7 @@ class LogoCreateFragment : DialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        loadDefaultImages()
         b.logoClose.setOnClickListener { if (!busy) dismiss() }
         b.fgPickButton.setOnClickListener { pickFg.launch("image/*") }
         b.bgPickButton.setOnClickListener { pickBg.launch("image/*") }
@@ -94,7 +95,7 @@ class LogoCreateFragment : DialogFragment() {
         b.fgRotateMinus.setOnClickListener { nudgeRotation(-1) }
         b.fgRotatePlus.setOnClickListener { nudgeRotation(1) }
 
-        b.bgTypeToggle.check(b.bgTypeColor.id)
+        b.bgTypeToggle.check(if (bgIsColor) b.bgTypeColor.id else b.bgTypeImage.id)
         b.bgTypeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
             if (isChecked) { bgIsColor = checkedId == b.bgTypeColor.id; applyBgType(); refresh() }
         }
@@ -120,6 +121,25 @@ class LogoCreateFragment : DialogFragment() {
     /** After the first foreground pick, relabel the picker to "Change image". */
     private fun onFgPicked() {
         b.fgPickButton.setText(R.string.logo_change_image)
+    }
+
+    /**
+     * Preselect the bundled default foreground/background so the creator opens
+     * with a ready-made icon instead of empty pickers. Only runs when the user
+     * hasn't already chosen images (e.g. before a config restore).
+     */
+    private fun loadDefaultImages() {
+        if (fg == null) {
+            fg = android.graphics.BitmapFactory.decodeResource(resources, R.drawable.default_fore)
+            if (fg != null) { onFgPicked() }
+        }
+        if (bgImg == null) {
+            bgImg = android.graphics.BitmapFactory.decodeResource(resources, R.drawable.default_bg)
+            if (bgImg != null) {
+                bgIsColor = false
+                b.bgPickButton.setText(R.string.logo_change_image)
+            }
+        }
     }
 
     private fun applyBgType() {

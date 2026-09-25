@@ -44,6 +44,7 @@ data class BuildItem(
 class BuildAdapter(
     private val onDownload: (BuildItem) -> Unit,
     private val onDownloadAab: (BuildItem) -> Unit = {},
+    private val onDownloadOptions: (BuildItem) -> Unit = {},
     private val onDownloadKeystore: (BuildItem) -> Unit = {},
     private val onUpdate: (BuildItem) -> Unit = {},
     private val onDelete: (BuildItem) -> Unit = {}
@@ -90,7 +91,7 @@ class BuildAdapter(
         val hasApk = item.downloadUrl.isNotEmpty()
         val hasAab = item.aabDownloadUrl.isNotEmpty()
         val canDownload = ready && (hasApk || hasAab)
-        setAction(b.itemDownload, canDownload) { if (hasApk) onDownload(item) else onDownloadAab(item) }
+        setAction(b.itemDownload, canDownload) { onDownloadOptions(item) }
 
         // Keystore — any ready build whose signing key was stored.
         val canKeystore = ready && item.keystoreAvailable && item.keystoreDownloadUrl.isNotEmpty()
@@ -99,8 +100,8 @@ class BuildAdapter(
         // Update — finished builds only (publish an update, or retry a failure).
         setAction(b.itemUpdate, ready || failed) { onUpdate(item) }
 
-        // Delete — always available; moves the app to Trash.
-        setAction(b.itemDelete, true) { onDelete(item) }
+        // Delete — red button in the header; moves the app to Trash.
+        b.itemDelete.setOnClickListener { onDelete(item) }
 
         // Info toggle + panel.
         val isOpen = expanded.contains(item.buildId)

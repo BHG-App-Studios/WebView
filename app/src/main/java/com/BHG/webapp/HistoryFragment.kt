@@ -35,6 +35,8 @@ class HistoryFragment : Fragment() {
 
     private lateinit var adapter: BuildAdapter
     private var listener: ListenerRegistration? = null
+    // Build awaiting a choice from the download-options sheet.
+    private var pendingDownload: BuildItem? = null
 
     override fun onCreateView(
         inflater: LayoutInflater,
@@ -50,10 +52,21 @@ class HistoryFragment : Fragment() {
         adapter = BuildAdapter(
             onDownload = ::download,
             onDownloadAab = ::downloadAab,
+            onDownloadOptions = ::showDownloadOptions,
             onDownloadKeystore = ::downloadKeystore,
             onUpdate = ::update,
             onDelete = ::confirmMoveToTrash
         )
+        parentFragmentManager.setFragmentResultListener(
+            DownloadOptionsSheet.RESULT_KEY, viewLifecycleOwner
+        ) { _, bundle ->
+            val item = pendingDownload ?: return@setFragmentResultListener
+            pendingDownload = null
+            when (bundle.getString(DownloadOptionsSheet.ARG_CHOICE)) {
+                DownloadOptionsSheet.CHOICE_APK -> download(item)
+                DownloadOptionsSheet.CHOICE_AAB -> downloadAab(item)
+            }
+        }
         binding.topBarMenu.setOnClickListener { (activity as? MainActivity)?.openDrawer() }
         binding.topBarTrash.setOnClickListener { (activity as? MainActivity)?.showTrash() }
         binding.historyList.layoutManager = LinearLayoutManager(requireContext())
@@ -117,6 +130,20 @@ class HistoryFragment : Fragment() {
         if (_binding == null) return
         binding.emptyState.visibility = if (empty) View.VISIBLE else View.GONE
         binding.historyList.visibility = if (empty) View.GONE else View.VISIBLE
+    }
+
+    /**
+     * Opens the download-options sheet so the user can pick APK or AAB (with a
+     * short explanation of each). Builds with only one artifact just show that
+     * one. The actual download runs when the sheet reports the choice back.
+     */
+    private fun showDownloadOptions(item: BuildItem) {
+        val hasApk = item.downloadUrl.isNotEmpty()
+        val hasAab = item.aabDownloadUrl.isNotEmpty()
+        if (!hasApk && !hasAab) return
+        pendingDownload = item
+        DownloadOptionsSheet.newInstance(hasApk, hasAab, item.buildType)
+            .show(parentFragmentManager, DownloadOptionsSheet.TAG)
     }
 
     private fun download(item: BuildItem) = enqueuePublic(

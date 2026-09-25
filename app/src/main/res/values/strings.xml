@@ -159,6 +159,14 @@
     <string name="build_queued">Build queued. This usually takes a few minutes.</string>
     <string name="build_ready">Your app is ready</string>
     <string name="download_apk">Download APK</string>
+    <!-- Download options bottom sheet -->
+    <string name="download_choose_title">Download</string>
+    <string name="download_choose_subtitle">Choose which file to download.</string>
+    <string name="download_apk_title">APK</string>
+    <string name="download_aab_title">Android App Bundle (AAB)</string>
+    <string name="download_apk_desc_release">Release build — installable and shareable with anyone. Works just like a production app, but it is not published on the Google Play Store.</string>
+    <string name="download_apk_desc_debug">Debug build — larger in size, slower, and for testing only. Not production or Play Store ready.</string>
+    <string name="download_aab_desc">Production-ready bundle. Upload this to the Google Play Store to publish your app.</string>
     <string name="build_failed">Build failed. Please try again.</string>
     <string name="download_started">Download started. Check your notifications.</string>
     <string name="error_url_required">Enter a website URL</string>

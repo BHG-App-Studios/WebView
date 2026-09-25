@@ -43,7 +43,6 @@ data class BuildItem(
  */
 class BuildAdapter(
     private val onDownload: (BuildItem) -> Unit,
-    private val onDownloadAab: (BuildItem) -> Unit = {},
     private val onDownloadOptions: (BuildItem) -> Unit = {},
     private val onDownloadKeystore: (BuildItem) -> Unit = {},
     private val onUpdate: (BuildItem) -> Unit = {},
@@ -111,12 +110,6 @@ class BuildAdapter(
             if (!expanded.remove(item.buildId)) expanded.add(item.buildId)
             notifyItemChanged(holder.bindingAdapterPosition)
         }
-
-        // AAB button lives in the info panel; shown only when both APK and AAB
-        // exist (AAB-only builds already download via the main Download button).
-        val showAabExtra = isOpen && ready && hasApk && hasAab
-        b.itemDownloadAab.visibility = if (showAabExtra) View.VISIBLE else View.GONE
-        b.itemDownloadAab.setOnClickListener { onDownloadAab(item) }
     }
 
     private fun setAction(btn: MaterialButton, enabled: Boolean, onClick: () -> Unit) {

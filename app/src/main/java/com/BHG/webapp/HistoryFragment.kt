@@ -51,7 +51,6 @@ class HistoryFragment : Fragment() {
         super.onViewCreated(view, savedInstanceState)
         adapter = BuildAdapter(
             onDownload = ::download,
-            onDownloadAab = ::downloadAab,
             onDownloadOptions = ::showDownloadOptions,
             onDownloadKeystore = ::downloadKeystore,
             onUpdate = ::update,

@@ -139,6 +139,15 @@ jobs:
             rm -f "$d"/ic_launcher*.png "$d"/ic_launcher*.webp "$d"/ic_launcher*.xml
           done
 
+          # The template already defines @color/ic_launcher_background (Asset
+          # Studio commonly declares it in colors.xml). Our generated set ships
+          # its own values/ic_launcher_background.xml, so any pre-existing
+          # definition must go or aapt fails with "Duplicate resources".
+          for f in "$RES"/values/*.xml; do
+            [ -f "$f" ] || continue
+            sed -i '/<color name="ic_launcher_background">/d' "$f"
+          done
+
           # The archive is rooted at app/src/main/ (res/mipmap-*/…, the adaptive
           # XMLs, and - for a colour background - values/ic_launcher_background.xml).
           unzip -o /tmp/icons.zip -d app/src/main/ >/dev/null

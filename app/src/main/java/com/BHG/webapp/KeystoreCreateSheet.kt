@@ -5,6 +5,7 @@ import android.util.Base64
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import com.BHG.webapp.databinding.SheetKeystoreCreateBinding
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -35,6 +36,10 @@ class KeystoreCreateSheet : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // Paint the system navigation-bar area with the sheet surface so the
+        // welded-to-bottom sheet has no transparent strip behind the nav bar.
+        dialog?.window?.navigationBarColor =
+            ContextCompat.getColor(requireContext(), R.color.nav_bar_bg)
         binding.aliasInput.setText(getString(R.string.keystore_create_alias_default))
         binding.sheetClose.setOnClickListener { if (!generating) dismiss() }
         binding.generateButton.setOnClickListener { onGenerate() }

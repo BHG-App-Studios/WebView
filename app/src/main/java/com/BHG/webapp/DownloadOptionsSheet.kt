@@ -4,6 +4,7 @@ import android.os.Bundle
 import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
+import androidx.core.content.ContextCompat
 import androidx.core.os.bundleOf
 import com.BHG.webapp.databinding.SheetDownloadOptionsBinding
 import com.google.android.material.bottomsheet.BottomSheetDialogFragment
@@ -33,6 +34,10 @@ class DownloadOptionsSheet : BottomSheetDialogFragment() {
 
     override fun onViewCreated(view: View, savedInstanceState: Bundle?) {
         super.onViewCreated(view, savedInstanceState)
+        // Paint the system navigation-bar area with the sheet surface so the
+        // welded-to-bottom sheet has no transparent strip behind the nav bar.
+        dialog?.window?.navigationBarColor =
+            ContextCompat.getColor(requireContext(), R.color.nav_bar_bg)
 
         val hasApk = arguments?.getBoolean(ARG_HAS_APK) ?: false
         val hasAab = arguments?.getBoolean(ARG_HAS_AAB) ?: false

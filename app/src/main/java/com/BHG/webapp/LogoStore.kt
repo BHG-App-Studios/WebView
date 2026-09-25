@@ -130,18 +130,12 @@ object LogoStore {
     }
 
     /**
-     * The design saved for [url], or — when that site has none — the most
-     * recently created design, so the creator opens on the user's last work
-     * instead of a generic default. Never throws.
+     * The design saved for [url], or null when that site has none — a design
+     * belongs to the site it was made for, so another site's logo is never
+     * offered here, not even as a starting point. Never throws.
      */
-    fun loadDraft(context: Context, url: String): Draft? = onIo {
-        val app = context.applicationContext
-        val key = keyFor(url)
-        read(app, key) ?: run {
-            val recent = order(app).firstOrNull { it != key }
-            if (recent != null) read(app, recent) else null
-        }
-    }
+    fun loadDraft(context: Context, url: String): Draft? =
+        onIo { read(context.applicationContext, keyFor(url)) }
 
     /** Persists the editor state for [url] without touching the generated icon set. */
     fun saveDraft(context: Context, url: String, draft: Draft): Boolean =

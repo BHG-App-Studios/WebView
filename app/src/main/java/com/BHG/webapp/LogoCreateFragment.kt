@@ -32,8 +32,8 @@ import java.io.ByteArrayOutputStream
  * The design is tied to the site it was made for ([ARG_URL]) and persisted by
  * [LogoStore], so it survives leaving the sheet and restarting the app:
  *
- *  - opening the sheet restores the design saved for that URL, falling back to
- *    the most recently created one;
+ *  - opening the sheet restores the design saved for that URL, or the defaults
+ *    when that site has none — never another site's logo;
  *  - "Use this logo" stores the generated ZIP + preview alongside the design and
  *    hands [HomeFragment] the stored paths through the Fragment Result API;
  *  - closing the sheet mid-edit keeps the tweaked design (only when it actually
@@ -179,7 +179,8 @@ class LogoCreateFragment : DialogFragment() {
     /**
      * Seeds the sheet: the bundled defaults first, so the preview is never blank,
      * then — a frame later and off the main thread — the design stored for this
-     * URL (or the most recent one), which replaces them. Best-effort throughout:
+     * URL, which replaces them. A site with nothing saved keeps the defaults;
+     * another site's logo is deliberately not offered. Best-effort throughout:
      * anything unreadable simply leaves the defaults in place.
      */
     private fun loadInitialDesign() {

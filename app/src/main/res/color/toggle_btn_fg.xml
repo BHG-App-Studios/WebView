@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Segmented-toggle label + icon: strong primary text on the selected segment,
+     muted secondary text on the unselected ones. Neutral, no accent colour. -->
+<selector xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:color="@color/text_primary" android:state_checked="true" />
+    <item android:color="@color/text_secondary" />
+</selector>

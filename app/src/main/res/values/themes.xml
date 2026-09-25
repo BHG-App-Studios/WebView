@@ -102,6 +102,30 @@
         <item name="cornerRadius">@dimen/field_radius</item>
     </style>
 
+    <!-- Segmented toggle segment (build type / output format / signing key).
+         Clean neutral look: strong text on a soft grey fill when selected, muted
+         text with a hairline outline otherwise — no baseline Material lavender. -->
+    <style name="Widget.App.ToggleButton" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="backgroundTint">@color/toggle_btn_bg</item>
+        <item name="android:textColor">@color/toggle_btn_fg</item>
+        <item name="iconTint">@color/toggle_btn_fg</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="rippleColor">?attr/colorControlHighlight</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="fontFamily">@font/roboto_semibold</item>
+    </style>
+
+    <!-- Neutral outlined action button (upload / create keystore): readable
+         on-surface label, muted icon, hairline outline — no brand-blue accent. -->
+    <style name="Widget.App.OutlinedButton.Neutral" parent="Widget.Material3.Button.OutlinedButton">
+        <item name="android:textColor">?attr/colorOnSurface</item>
+        <item name="iconTint">?attr/colorOnSurfaceVariant</item>
+        <item name="strokeColor">?attr/colorOutline</item>
+        <item name="rippleColor">?attr/colorControlHighlight</item>
+        <item name="android:textAllCaps">false</item>
+        <item name="fontFamily">@font/roboto_semibold</item>
+    </style>
+
     <style name="Widget.App.Switch" parent="Widget.Material3.CompoundButton.MaterialSwitch">
         <item name="trackTint">@color/switch_track_tint</item>
         <item name="thumbTint">@color/switch_thumb_tint</item>

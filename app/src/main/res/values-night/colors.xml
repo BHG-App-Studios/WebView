@@ -56,4 +56,8 @@
     <!-- Scrim -->
     <color name="scrim">#99000000</color>
     <color name="nav_capsule_stroke">#1FFFFFFF</color>
+
+    <!-- Selected segment fill for the build-type / output / signing toggles.
+         A subtle blue-grey, echoing the download sheet's option surface. -->
+    <color name="toggle_selected_bg">#2B2F36</color>
 </resources>

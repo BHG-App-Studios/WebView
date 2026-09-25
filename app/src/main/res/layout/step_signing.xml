@@ -77,7 +77,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buildTypeDebug"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.App.ToggleButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -85,7 +85,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/buildTypeRelease"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.App.ToggleButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -128,7 +128,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/outputApk"
-                    style="?attr/materialButtonOutlinedStyle"
+                    style="@style/Widget.App.ToggleButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
@@ -136,7 +136,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/outputAab"
-                    style="?attr/materialButtonOutlinedStyle"
+                    style="@style/Widget.App.ToggleButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
@@ -144,7 +144,7 @@
 
                 <com.google.android.material.button.MaterialButton
                     android:id="@+id/outputBoth"
-                    style="?attr/materialButtonOutlinedStyle"
+                    style="@style/Widget.App.ToggleButton"
                     android:layout_width="0dp"
                     android:layout_weight="1"
                     android:layout_height="wrap_content"
@@ -180,7 +180,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/signingAuto"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.App.ToggleButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -188,7 +188,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/signingCustom"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.App.ToggleButton"
                 android:layout_width="0dp"
                 android:layout_weight="1"
                 android:layout_height="wrap_content"
@@ -213,7 +213,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/pickKeystoreButton"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.App.OutlinedButton.Neutral"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="14dp"
@@ -222,7 +222,7 @@
 
             <com.google.android.material.button.MaterialButton
                 android:id="@+id/createKeystoreButton"
-                style="?attr/materialButtonOutlinedStyle"
+                style="@style/Widget.App.OutlinedButton.Neutral"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginTop="10dp"

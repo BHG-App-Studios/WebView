@@ -43,6 +43,7 @@ class LogoCreateFragment : DialogFragment() {
     private var bgIsColor = true
     private var bgColor = Color.parseColor("#FAFAFA")
     private var fgResize = 69
+    private var fgRotation = 0
     private var bgResize = 100
     private var busy = false
 
@@ -84,6 +85,14 @@ class LogoCreateFragment : DialogFragment() {
         b.bgSizeSlider.addOnChangeListener { _, v, _ ->
             bgResize = v.toInt(); b.bgSizeValue.text = pct(bgResize); refresh()
         }
+
+        b.fgRotationSlider.value = fgRotation.toFloat()
+        b.fgRotationValue.text = deg(fgRotation)
+        b.fgRotationSlider.addOnChangeListener { _, v, _ ->
+            fgRotation = v.toInt(); b.fgRotationValue.text = deg(fgRotation); refresh()
+        }
+        b.fgRotateMinus.setOnClickListener { nudgeRotation(-1) }
+        b.fgRotatePlus.setOnClickListener { nudgeRotation(1) }
 
         b.bgTypeToggle.check(b.bgTypeColor.id)
         b.bgTypeToggle.addOnButtonCheckedListener { _, checkedId, isChecked ->
@@ -151,7 +160,8 @@ class LogoCreateFragment : DialogFragment() {
             bgIsColor = bgIsColor,
             bgColor = bgColor,
             bgImage = bgImg,
-            bgResizePct = bgResize
+            bgResizePct = bgResize,
+            fgRotationDeg = fgRotation
         )
     }
 
@@ -160,7 +170,7 @@ class LogoCreateFragment : DialogFragment() {
 
         // Separate layer previews so each choice is visible on its own.
         val f = fg
-        if (f != null) b.fgPreview.setImageBitmap(IconRenderer.previewForeground(f, fgResize, 216))
+        if (f != null) b.fgPreview.setImageBitmap(IconRenderer.previewForeground(f, fgResize, 216, fgRotation))
         else b.fgPreview.setImageDrawable(null)
 
         if (!bgIsColor) {
@@ -181,6 +191,15 @@ class LogoCreateFragment : DialogFragment() {
     }
 
     private fun pct(v: Int): String = "$v%"
+
+    private fun deg(v: Int): String = "$v°"
+
+    /** Steps rotation by [delta]°, wrapping to the slider's -180..180 range. */
+    private fun nudgeRotation(delta: Int) {
+        var r = fgRotation + delta
+        r = ((r + 180) % 360 + 360) % 360 - 180
+        b.fgRotationSlider.value = r.toFloat()   // fires the listener → updates state + preview
+    }
 
     /** Opens the real HSV colour picker seeded with the current background colour. */
     private fun openColorPicker() {

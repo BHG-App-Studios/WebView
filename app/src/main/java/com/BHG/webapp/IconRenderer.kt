@@ -31,6 +31,7 @@ object IconRenderer {
         val bgColor: Int,
         val bgImage: Bitmap?,
         val bgResizePct: Int,
+        val fgRotationDeg: Int = 0,
         val name: String = "ic_launcher"
     )
 
@@ -47,8 +48,9 @@ object IconRenderer {
     private fun newCanvas(size: Int): Bitmap =
         Bitmap.createBitmap(size, size, Bitmap.Config.ARGB_8888)
 
-    /** Draws [src] centered on a [size]×[size] area; its longest side = size*pct/100. */
-    private fun drawFitted(canvas: Canvas, src: Bitmap, size: Int, pct: Int) {
+    /** Draws [src] centered on a [size]×[size] area; its longest side = size*pct/100.
+     *  [rotationDeg] spins the image about the canvas centre. */
+    private fun drawFitted(canvas: Canvas, src: Bitmap, size: Int, pct: Int, rotationDeg: Float = 0f) {
         val target = size * pct / 100f
         val scale = target / max(src.width, src.height)
         val w = src.width * scale
@@ -56,12 +58,15 @@ object IconRenderer {
         val left = (size - w) / 2f
         val top = (size - h) / 2f
         val paint = Paint(Paint.ANTI_ALIAS_FLAG).apply { isFilterBitmap = true }
+        val save = canvas.save()
+        if (rotationDeg != 0f) canvas.rotate(rotationDeg, size / 2f, size / 2f)
         canvas.drawBitmap(src, null, RectF(left, top, left + w, top + h), paint)
+        canvas.restoreToCount(save)
     }
 
     fun renderForeground(cfg: Config, size: Int): Bitmap {
         val bmp = newCanvas(size)
-        drawFitted(Canvas(bmp), cfg.foreground, size, cfg.fgResizePct)
+        drawFitted(Canvas(bmp), cfg.foreground, size, cfg.fgResizePct, cfg.fgRotationDeg.toFloat())
         return bmp
     }
 
@@ -86,9 +91,9 @@ object IconRenderer {
     }
 
     /** Foreground layer alone (transparent elsewhere) — for the section preview. */
-    fun previewForeground(fg: Bitmap, pct: Int, size: Int): Bitmap {
+    fun previewForeground(fg: Bitmap, pct: Int, size: Int, rotationDeg: Int = 0): Bitmap {
         val bmp = newCanvas(size)
-        drawFitted(Canvas(bmp), fg, size, pct)
+        drawFitted(Canvas(bmp), fg, size, pct, rotationDeg.toFloat())
         return bmp
     }
 
@@ -104,7 +109,7 @@ object IconRenderer {
     /** Auto silhouette: the foreground with every pixel forced black, alpha kept. */
     private fun renderMono(cfg: Config, size: Int): Bitmap {
         val bmp = newCanvas(size)
-        drawFitted(Canvas(bmp), cfg.foreground, size, MONO_RESIZE)
+        drawFitted(Canvas(bmp), cfg.foreground, size, MONO_RESIZE, cfg.fgRotationDeg.toFloat())
         val px = IntArray(size * size)
         bmp.getPixels(px, 0, size, 0, 0, size, size)
         for (i in px.indices) px[i] = px[i] and 0xFF000000.toInt()  // keep alpha, RGB=0

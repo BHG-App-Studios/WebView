@@ -258,6 +258,7 @@
     <string name="logo_pick_background">Choose background image</string>
     <string name="logo_change_image">Change image</string>
     <string name="logo_foreground_size">Foreground size</string>
+    <string name="logo_foreground_rotation">Foreground rotation</string>
     <string name="logo_background_size">Background image size</string>
     <string name="logo_bg_type_color">Color</string>
     <string name="logo_bg_type_image">Image</string>

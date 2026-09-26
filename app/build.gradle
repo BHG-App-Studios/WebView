@@ -62,6 +62,9 @@ dependencies {
     implementation libs.googleid
     implementation libs.play.services.ads
 
+    // Google Play In-App Updates (immediate)
+    implementation libs.app.update.ktx
+
     // BouncyCastle — builds the self-signed X.509 cert for on-device keystore
     // generation (Android has no public API to create/sign an X.509 cert).
     implementation "org.bouncycastle:bcprov-jdk15on:1.70"

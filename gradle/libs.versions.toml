@@ -18,6 +18,7 @@ viewpager2 = "1.1.0"
 junit = "4.13.2"
 junitVersion = "1.3.0"
 playServicesAds = "25.5.0"
+appUpdate = "2.1.0"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -48,6 +49,9 @@ androidx-credentials = { module = "androidx.credentials:credentials", version.re
 androidx-credentials-play-services-auth = { module = "androidx.credentials:credentials-play-services-auth", version.ref = "credentials" }
 googleid = { module = "com.google.android.libraries.identity.googleid:googleid", version.ref = "googleid" }
 play-services-ads = { module = "com.google.android.gms:play-services-ads", version.ref = "playServicesAds" }
+
+# Google Play In-App Updates (immediate updates)
+app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdate" }
 
 
 # Core library desugaring

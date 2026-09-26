@@ -40,6 +40,9 @@ class MainActivity : AppCompatActivity() {
     private var auth: FirebaseAuth? = null
     private var firestore: FirebaseFirestore? = null
 
+    /** Google Play immediate in-app updates. Null until past the auth guard. */
+    private var inAppUpdateManager: InAppUpdateManager? = null
+
     private var currentTab = 0
 
     /**
@@ -104,6 +107,10 @@ class MainActivity : AppCompatActivity() {
         }
         syncNavSelection()
         setupBackPress()
+
+        // Offer a Google Play immediate update if one is live. Registered here in
+        // onCreate (before the activity is STARTED) as the Activity Result API needs.
+        inAppUpdateManager = InAppUpdateManager(this).also { it.checkForUpdate() }
 
         // When an overlay (Trash) is popped off the back stack, bring the capsule
         // nav back with a smooth slide.
@@ -375,6 +382,13 @@ class MainActivity : AppCompatActivity() {
     override fun onSaveInstanceState(outState: Bundle) {
         super.onSaveInstanceState(outState)
         outState.putInt(KEY_TAB, currentTab)
+    }
+
+    override fun onResume() {
+        super.onResume()
+        // If an immediate update was accepted but interrupted (user backgrounded
+        // the app mid-download), Play reports it in progress and we resume it.
+        inAppUpdateManager?.resumeIfInProgress()
     }
 
     private companion object {

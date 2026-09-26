@@ -656,6 +656,7 @@ export default {
           `${uid}/aabs/${buildId}.aab`,
           `${uid}/downloads/${buildId}.keystore.zip`,
           `${uid}/signing/${buildId}/bundle.json`,
+          `${uid}/icons/${buildId}/icons.zip`,
           previewKey(uid, buildId),
         ];
         try {

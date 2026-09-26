@@ -19,6 +19,7 @@ junit = "4.13.2"
 junitVersion = "1.3.0"
 playServicesAds = "25.5.0"
 appUpdate = "2.1.0"
+review = "2.0.2"
 
 [plugins]
 android-application = { id = "com.android.application", version.ref = "agp" }
@@ -52,6 +53,9 @@ play-services-ads = { module = "com.google.android.gms:play-services-ads", versi
 
 # Google Play In-App Updates (immediate updates)
 app-update-ktx = { module = "com.google.android.play:app-update-ktx", version.ref = "appUpdate" }
+
+# Google Play In-App Review
+review-ktx = { module = "com.google.android.play:review-ktx", version.ref = "review" }
 
 
 # Core library desugaring

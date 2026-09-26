@@ -43,6 +43,9 @@ class MainActivity : AppCompatActivity() {
     /** Google Play immediate in-app updates. Null until past the auth guard. */
     private var inAppUpdateManager: InAppUpdateManager? = null
 
+    /** Google Play in-app review. Null until past the auth guard. */
+    private var inAppReviewManager: InAppReviewManager? = null
+
     private var currentTab = 0
 
     /**
@@ -111,6 +114,11 @@ class MainActivity : AppCompatActivity() {
         // Offer a Google Play immediate update if one is live. Registered here in
         // onCreate (before the activity is STARTED) as the Activity Result API needs.
         inAppUpdateManager = InAppUpdateManager(this).also { it.checkForUpdate() }
+
+        // In-app review: only ever shown once the user has a build that reached
+        // READY (checked against Firestore inside the manager). Attempted from
+        // onResume so an update flow, if any, takes precedence first.
+        inAppReviewManager = InAppReviewManager(this)
 
         // When an overlay (Trash) is popped off the back stack, bring the capsule
         // nav back with a smooth slide.
@@ -389,6 +397,10 @@ class MainActivity : AppCompatActivity() {
         // If an immediate update was accepted but interrupted (user backgrounded
         // the app mid-download), Play reports it in progress and we resume it.
         inAppUpdateManager?.resumeIfInProgress()
+
+        // Offer the review card if eligible (≥1 READY build). No-ops until then,
+        // and self-throttles so it never nags on every foreground.
+        inAppReviewManager?.requestReviewIfEligible(firestore, auth?.currentUser?.uid)
     }
 
     private companion object {

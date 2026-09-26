@@ -11,8 +11,8 @@ android {
         applicationId "com.BHG.webapp"
         minSdk 24
         targetSdk 37
-        versionCode 3
-        versionName "3.0"
+        versionCode 4
+        versionName "4.0"
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
     }
 
@@ -64,6 +64,9 @@ dependencies {
 
     // Google Play In-App Updates (immediate)
     implementation libs.app.update.ktx
+
+    // Google Play In-App Review
+    implementation libs.review.ktx
 
     // BouncyCastle — builds the self-signed X.509 cert for on-device keystore
     // generation (Android has no public API to create/sign an X.509 cert).

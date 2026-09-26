@@ -1,0 +1,8 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Default (smallest-width < 360dp, e.g. 320dp phones): the capsule is too
+         narrow for the selected pill's label without it wrapping to two lines
+         ("Ho me"), so the nav stays icon-only. Overridden to true in
+         values-sw360dp for 360dp+ devices, where the label fits on one line. -->
+    <bool name="nav_show_labels">false</bool>
+</resources>

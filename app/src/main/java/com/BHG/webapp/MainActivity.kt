@@ -173,13 +173,16 @@ class MainActivity : AppCompatActivity() {
         syncNavSelection()
     }
 
-    /** Checks the active button (label shown) and collapses the rest to icon-only. */
+    /** Checks the active button (label shown) and collapses the rest to icon-only.
+     *  On narrow devices (smallest width < 360dp) the capsule can't fit the label
+     *  without it wrapping to two lines, so we keep every pill icon-only there. */
     private fun syncNavSelection() {
         if (!::navButtons.isInitialized) return
+        val showLabels = resources.getBoolean(R.bool.nav_show_labels)
         navButtons.forEach { (id, button) ->
             val selected = id == currentTab
             button.isChecked = selected
-            button.text = if (selected) getString(navLabels.getValue(id)) else ""
+            button.text = if (selected && showLabels) getString(navLabels.getValue(id)) else ""
         }
     }
 

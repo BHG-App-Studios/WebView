@@ -216,8 +216,8 @@
     <string name="active_retry">Try Again</string>
 
     <!-- Profile -->
-    <string name="profile_stat_total">Total builds</string>
-    <string name="profile_stat_ready">Ready</string>
+    <string name="profile_stat_total">Builds</string>
+    <string name="profile_stat_ready">Failed</string>
     <string name="profile_user_id">User ID</string>
 
     <!-- Options bottom sheet -->

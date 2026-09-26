@@ -70,10 +70,14 @@ class ProfileFragment : Fragment() {
             .addSnapshotListener { snapshot, error ->
                 if (_binding == null || error != null) return@addSnapshotListener
                 val docs = snapshot?.documents.orEmpty()
-                val total = docs.size
-                val ready = docs.count { it.getString("status") == "READY" }
+                val failed = docs.count {
+                    val s = it.getString("status")
+                    s == "FAILED" || s == "REJECTED"
+                }
+                // Total = everything that isn't a failed build (READY + BUILDING + …).
+                val total = docs.size - failed
                 binding.statTotal.text = total.toString()
-                binding.statReady.text = ready.toString()
+                binding.statReady.text = failed.toString()
             }
     }
 

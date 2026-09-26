@@ -14,6 +14,7 @@ import android.view.LayoutInflater
 import android.view.View
 import android.view.ViewGroup
 import android.view.animation.AccelerateDecelerateInterpolator
+import android.view.inputmethod.InputMethodManager
 import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
@@ -776,6 +777,9 @@ class HomeFragment : Fragment() {
 
             if (reachable) {
                 confirmedUrl = url
+                // Leaving the entry screen — drop the soft keyboard if it's up so
+                // it doesn't linger over the App Details page.
+                hideKeyboard()
                 // Every time a URL is confirmed we start a fresh build: never
                 // carry over a keystore picked for a previous attempt. Nothing
                 // about the last selection is stored.
@@ -794,6 +798,14 @@ class HomeFragment : Fragment() {
                 entry.entryUrlLayout.error = getString(R.string.error_url_unreachable)
             }
         }
+    }
+
+    // Close the soft keyboard if it's currently showing; no-op otherwise.
+    private fun hideKeyboard() {
+        val focused = activity?.currentFocus ?: view ?: return
+        val imm = context?.getSystemService(Context.INPUT_METHOD_SERVICE) as? InputMethodManager
+        imm?.hideSoftInputFromWindow(focused.windowToken, 0)
+        focused.clearFocus()
     }
 
     // =========================================================================

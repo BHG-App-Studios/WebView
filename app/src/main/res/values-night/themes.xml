@@ -1,8 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!--
-        The base Theme.WebsiteAppBuilder (values/themes.xml) resolves all of its
-        colors through @color/* references, and values-night/colors.xml supplies
-        the dark palette — so no per-night theme override is needed here.
-    -->
-</resources>

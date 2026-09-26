@@ -231,7 +231,7 @@
         <item name="cornerRadius">@dimen/nav_pill_radius</item>
         <item name="rippleColor">@color/nav_item_fg</item>
         <item name="android:textAllCaps">false</item>
-        <item name="android:textSize">12sp</item>
+        <item name="android:textSize">14sp</item>
         <item name="fontFamily">@font/roboto_semibold</item>
         <item name="android:fontFamily">@font/roboto_semibold</item>
         <item name="elevation">0dp</item>

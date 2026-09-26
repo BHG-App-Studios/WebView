@@ -124,6 +124,25 @@ export default {
           return jsonResponse({ error: icon.error }, 400, corsHeaders);
         }
 
+        // Preview image (optional). Sent like the icon ZIP above and stored in the
+        // same build folder, beside it. Decoration rather than build input, so it
+        // is staged best-effort and never fails a build. The URL is written onto
+        // the build doc here because the Worker is the side that knows the origin
+        // it will be served from; it is served by the /download route below.
+        const preview = await stagePreviewImage(body, buildId, uid, env);
+        const previewUrl = preview.staged
+          ? `${url.origin}/download/${uidParam}/${buildId}.webp`
+          : "";
+        if (previewUrl) {
+          try {
+            await updateBuildDoc(env, uid, buildId, { previewImage: previewUrl });
+          } catch (e) {
+            // Best-effort like the artifact uploads: the image is already stored,
+            // and a Firestore hiccup must not cost the user their build.
+            console.log(`Firestore previewImage update failed for ${buildId}: ${e.message}`);
+          }
+        }
+
         // Customisation: every AppConfig.kt constant
         const resolved = resolveOptions(body);
         if (resolved.error) {
@@ -207,6 +226,7 @@ export default {
           outputs: signing.outputs,
           signing_mode: signing.signingMode,
           download_url: downloadUrl,
+          preview_image_url: previewUrl,
           status_url: `${url.origin}/api/status/${buildId}?uid=${uidParam}`,
           message: ghMessage,
           options: resolved.options,
@@ -484,11 +504,13 @@ export default {
       }
 
       // ----------------------------------------------------
-      // 3. PUBLIC DOWNLOAD: GET /download/:buildId.apk  (or .aab)
+      // 3. PUBLIC DOWNLOAD: GET /download/:uid/:file
+      //      .apk / .aab -> the built artifacts, as attachments
+      //      .webp       -> the build's preview image, inline
       // ----------------------------------------------------
       if (method === "GET" && path.startsWith("/download/")) {
-        // Path is /download/{uid}/{buildId}.(apk|aab): the artifact lives in the
-        // owner's folder. Split off the uid; the rest is the file name.
+        // Path is /download/{uid}/{file}: the artifact lives in the owner's
+        // folder. Split off the uid; the rest is the file name.
         const rest = path.replace("/download/", "").trim();
         const slash = rest.indexOf("/");
         if (slash < 1) {
@@ -496,6 +518,32 @@ export default {
         }
         const dlUid = rest.slice(0, slash);
         let fileName = rest.slice(slash + 1);
+
+        // Preview image. Stored beside the icons.zip the app uploaded for this
+        // build, so it is addressed as /download/{uid}/{buildId}.webp and read
+        // from {uid}/icons/{buildId}/preview.webp. Served inline rather than as an
+        // attachment, so it renders in an <img> tag or a browser tab. Both halves
+        // arrive on the URL and go into an R2 key, so they are shape-checked first
+        // - the build id against the one format this pipeline issues.
+        if (fileName.endsWith(".webp")) {
+          const previewBuild = fileName.slice(0, -".webp".length);
+          if (!SAFE_ID_RE.test(dlUid) || !BUILD_ID_RE.test(previewBuild)) {
+            return new Response("Not found", { status: 404, headers: { "Content-Type": "text/plain" } });
+          }
+          const image = await env.BUCKET.get(`${dlUid}/icons/${previewBuild}/preview.webp`);
+          if (!image) {
+            return new Response(`No preview for '${previewBuild}'`, {
+              status: 404, headers: { "Content-Type": "text/plain" }
+            });
+          }
+          const imageHeaders = new Headers();
+          imageHeaders.set("Content-Type", "image/webp");
+          imageHeaders.set("Content-Disposition", `inline; filename="${previewBuild}.webp"`);
+          // Keyed by build id, so the bytes behind a URL never change.
+          imageHeaders.set("Cache-Control", "public, max-age=86400, immutable");
+          return new Response(image.body, { headers: imageHeaders });
+        }
+
         // Default to .apk; .aab is served from its own R2 prefix.
         const isAab = fileName.endsWith(".aab");
         if (!fileName.endsWith(".apk") && !isAab) {
@@ -574,8 +622,9 @@ export default {
       // ----------------------------------------------------
       // 3c. PERMANENT DELETE: DELETE /api/app/:buildId
       //     Owner-only (Firebase ID token). Wipes every server-side artifact for
-      //     this build from R2 — APK, AAB, the owner keystore bundle and the
-      //     runner's signing bundle. The per-package auto keystore
+      //     this build from R2 — APK, AAB, the owner keystore bundle, the
+      //     runner's signing bundle and the build's preview image. The per-package
+      //     auto keystore
       //     ({uid}/keystores/{package}.jks) is intentionally left untouched: it
       //     is shared across all builds of that package, so removing it would
       //     break updates of other apps. The caller deletes the Firestore doc.
@@ -607,6 +656,7 @@ export default {
           `${uid}/aabs/${buildId}.aab`,
           `${uid}/downloads/${buildId}.keystore.zip`,
           `${uid}/signing/${buildId}/bundle.json`,
+          previewKey(uid, buildId),
         ];
         try {
           await Promise.all(keys.map((k) => env.BUCKET.delete(k)));
@@ -686,7 +736,8 @@ export default {
           list_options: "GET /api/options",
           upload_apk: "PUT /api/upload/:buildId",
           check_status: "GET /api/status/:buildId",
-          download_apk: "GET /download/:buildId.apk"
+          download_apk: "GET /download/:uid/:buildId.apk",
+          download_preview: "GET /download/:uid/:buildId.webp"
         }
       }, 200, corsHeaders);
 
@@ -706,6 +757,11 @@ function jsonResponse(data, status = 200, extraHeaders = {}) {
     }
   });
 }
+
+// Path segments that may address an R2 object: a Firebase uid, a package name.
+// Deliberately narrow - these arrive on a public URL and are concatenated
+// straight into an object key.
+const SAFE_ID_RE = /^[A-Za-z0-9_.-]{1,128}$/;
 
 // --------------------------------------------------------
 // App name / package name normalisation
@@ -962,6 +1018,11 @@ function resolveOptions(body) {
 //                                         with another user, even same package)
 //   {uid}/keystores/{package}.json      - its passwords/alias, retained alongside
 //   {uid}/downloads/{buildId}.keystore.zip - the user-downloadable bundle (auto mode)
+//   {uid}/icons/{buildId}/icons.zip     - the launcher icon set the app generated
+//                                         for this build, fetched by the runner
+//   {uid}/icons/{buildId}/preview.webp  - one preview image of that icon, kept in
+//                                         the same folder as the ZIP and served
+//                                         publicly via /download/{uid}/{buildId}.webp
 //
 // A keystore password can never ride in the GitHub dispatch payload (it is
 // echoed to the Action log). So the payload carries only a fetch URL; the
@@ -1149,6 +1210,57 @@ async function stageIconZip(body, buildId, uid, env) {
     customMetadata: { uploadedAt: new Date().toISOString() }
   });
   return { staged: true };
+}
+
+/**
+ * Preview image for the built app (optional).
+ *
+ * One small WebP of the launcher icon this build will carry, sent as base64 in
+ * the build-request body exactly like the icon ZIP above. It is stored in that
+ * same build folder - {uid}/icons/{buildId}/preview.webp, beside icons.zip - and
+ * served by the existing public GET /download/{uid}/{buildId}.webp route. The
+ * Worker then writes that URL onto the build doc as `previewImage`, so a finished
+ * build can be shown without downloading it.
+ *
+ * Unlike the icon ZIP this is decoration rather than build input, so it is staged
+ * best-effort: anything missing, oversized or malformed is logged and skipped
+ * instead of failing a build the user is waiting on.
+ *
+ * @returns {{staged: boolean}} - true once the WebP is in R2.
+ */
+async function stagePreviewImage(body, buildId, uid, env) {
+  const b64 = typeof body.preview_image_b64 === "string" ? body.preview_image_b64.trim() : "";
+  if (!b64) return { staged: false };
+  // A 192px square WebP is a handful of KB; well past a megabyte is not one, and
+  // is more likely a mis-set field than a preview worth storing.
+  if (b64.length > 2 * 1024 * 1024) {
+    console.log(`Preview image for ${buildId} is too large; skipping`);
+    return { staged: false };
+  }
+  if (!/^[A-Za-z0-9+/=\r\n]+$/.test(b64)) {
+    console.log(`Preview image for ${buildId} is not base64; skipping`);
+    return { staged: false };
+  }
+
+  try {
+    const bytes = Uint8Array.from(atob(b64.replace(/\s+/g, "")), (c) => c.charCodeAt(0));
+    await env.BUCKET.put(previewKey(uid, buildId), bytes, {
+      httpMetadata: { contentType: "image/webp" },
+      customMetadata: { uploadedAt: new Date().toISOString() }
+    });
+    return { staged: true };
+  } catch (e) {
+    console.log(`Preview image staging failed for ${buildId}: ${e.message}`);
+    return { staged: false };
+  }
+}
+
+/**
+ * Where a build's preview image lives: inside the build's own icons folder,
+ * beside the icons.zip the runner extracts. One build, one folder.
+ */
+function previewKey(uid, buildId) {
+  return `${uid}/icons/${buildId}/preview.webp`;
 }
 
 // --------------------------------------------------------

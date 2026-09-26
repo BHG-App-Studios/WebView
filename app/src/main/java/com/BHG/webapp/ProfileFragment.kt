@@ -74,8 +74,11 @@ class ProfileFragment : Fragment() {
                     val s = it.getString("status")
                     s == "FAILED" || s == "REJECTED"
                 }
-                // Total = everything that isn't a failed build (READY + BUILDING + …).
-                val total = docs.size - failed
+                val building = docs.count { it.getString("status") == "BUILDING" }
+                // Total = finished, non-failed builds only (READY + anything else).
+                // In-progress (BUILDING) builds aren't counted until they land in
+                // either total or failed.
+                val total = docs.size - failed - building
                 binding.statTotal.text = total.toString()
                 binding.statReady.text = failed.toString()
             }

@@ -40,6 +40,10 @@ class TrashAdapter(
         b.itemUrl.text = item.url
         b.itemDate.text = if (item.createdAtMs > 0) BuildInfoPanel.DATE_FMT.format(Date(item.createdAtMs)) else ""
 
+        // The preview survives the move to Trash — it is only deleted when the app
+        // is, so a trashed app still shows as itself here.
+        AppIconLoader.bind(b.itemIcon, b.itemIconBadge, b.itemIconGlyph, item.previewImage)
+
         val showSize = item.status == "READY" && item.sizeBytes > 0
         b.itemSize.visibility = if (showSize) View.VISIBLE else View.GONE
         if (showSize) b.itemSize.text = BuildInfoPanel.formatSize(item.sizeBytes)

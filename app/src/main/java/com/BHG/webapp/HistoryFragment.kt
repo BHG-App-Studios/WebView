@@ -117,6 +117,7 @@ class HistoryFragment : Fragment() {
                         aabDownloadUrl = doc.getString("aabDownloadUrl") ?: "",
                         keystoreAvailable = doc.getBoolean("keystoreAvailable") ?: false,
                         keystoreDownloadUrl = doc.getString("keystoreDownloadUrl") ?: "",
+                        previewImage = doc.getString("previewImage") ?: "",
                         packageName = doc.getString("packageName") ?: "",
                         versionName = doc.getString("versionName") ?: "",
                         versionCode = doc.getLong("versionCode") ?: 0L,

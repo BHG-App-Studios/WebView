@@ -22,6 +22,10 @@ data class BuildItem(
     val aabDownloadUrl: String = "",
     val keystoreAvailable: Boolean = false,
     val keystoreDownloadUrl: String = "",
+    // Public URL of the app's launcher-icon preview on Cloudflare, written by the
+    // build Worker. Empty for a build made before previews existed, or one whose
+    // preview never staged — those cards keep the placeholder badge.
+    val previewImage: String = "",
     // Details shown in the expandable Info panel.
     val packageName: String = "",
     val versionName: String = "",
@@ -67,6 +71,9 @@ class BuildAdapter(
 
         b.itemAppName.text = item.appName.ifEmpty { ctx.getString(R.string.app_display_name) }
         b.itemUrl.text = item.url
+
+        // The app's own launcher icon where the build has one, the badge otherwise.
+        AppIconLoader.bind(b.itemIcon, b.itemIconBadge, b.itemIconGlyph, item.previewImage)
 
         val hasApk = item.downloadUrl.isNotEmpty()
         val hasAab = item.aabDownloadUrl.isNotEmpty()

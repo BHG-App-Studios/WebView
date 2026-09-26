@@ -41,6 +41,10 @@ class ActiveBuildAdapter(
         b.itemUrl.text = item.url
         b.itemTime.text = if (item.createdAtMs > 0) friendlyTime(Date(item.createdAtMs)) else "Just now"
 
+        // The Worker stages the preview when it dispatches the build, so a build
+        // still running already has its icon — fall back to the badge until then.
+        AppIconLoader.bind(b.itemIcon, b.itemIconBadge, b.itemIconGlyph, item.previewImage)
+
         when (item.status) {
             "READY" -> {
                 b.itemSpinner.visibility = View.GONE

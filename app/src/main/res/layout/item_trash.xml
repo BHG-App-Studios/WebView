@@ -21,21 +21,33 @@
             android:orientation="horizontal"
             android:gravity="center_vertical">
 
+            <!-- Badge + glyph are the placeholder while there is no preview;
+                 itemIcon covers both once Cloudflare has one. -->
             <FrameLayout
                 android:layout_width="46dp"
                 android:layout_height="46dp">
 
                 <View
+                    android:id="@+id/itemIconBadge"
                     android:layout_width="46dp"
                     android:layout_height="46dp"
                     android:background="@drawable/bg_circle_primary" />
 
                 <ImageView
+                    android:id="@+id/itemIconGlyph"
                     android:layout_width="24dp"
                     android:layout_height="24dp"
                     android:layout_gravity="center"
                     android:src="@drawable/ic_delete"
                     app:tint="?attr/colorPrimary" />
+
+                <com.google.android.material.imageview.ShapeableImageView
+                    android:id="@+id/itemIcon"
+                    android:layout_width="46dp"
+                    android:layout_height="46dp"
+                    android:scaleType="fitCenter"
+                    android:visibility="gone"
+                    app:shapeAppearanceOverlay="@style/AppIconImage" />
             </FrameLayout>
 
             <LinearLayout

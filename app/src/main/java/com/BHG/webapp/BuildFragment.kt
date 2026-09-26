@@ -103,7 +103,8 @@ class BuildFragment : Fragment() {
                         url = doc.getString("url") ?: "",
                         status = doc.getString("status") ?: "BUILDING",
                         downloadUrl = doc.getString("downloadUrl") ?: "",
-                        createdAtMs = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L
+                        createdAtMs = doc.getTimestamp("createdAt")?.toDate()?.time ?: 0L,
+                        previewImage = doc.getString("previewImage") ?: ""
                     )
                 }
 

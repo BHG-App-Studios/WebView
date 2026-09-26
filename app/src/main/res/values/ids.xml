@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <item name="nav_landing" type="id" />
+    <!-- Set on a card's icon slot to the preview URL it is showing, so a result
+         that lands after the row was recycled can tell it is no longer wanted. -->
+    <item name="tag_icon_url" type="id" />
 </resources>

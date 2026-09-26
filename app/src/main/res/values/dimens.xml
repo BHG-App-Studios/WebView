@@ -15,4 +15,10 @@
     <dimen name="nav_item_height">48dp</dimen>
     <dimen name="nav_item_icon_size">24dp</dimen>
     <dimen name="nav_item_icon_padding">8dp</dimen>
+
+    <!-- Footprint of the floating capsule measured from the screen edge, above the
+         system gesture/nav bar: nav_item_height (48) + capsule top+bottom padding (12)
+         + nav_pill_margin (16). The entry screen reserves this so its card centres in
+         the band between the top bar and the capsule. -->
+    <dimen name="entry_capsule_clearance">92dp</dimen>
 </resources>

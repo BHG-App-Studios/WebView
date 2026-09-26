@@ -262,18 +262,32 @@ class HomeFragment : Fragment() {
     }
 
     /**
-     * Bottom padding for the pager depends on the step. Steps 1–3 show the floating
-     * Next button, so they reserve [NEXT_CLEARANCE_DP] for it; the entry and signing
-     * steps have no floating button, so they only clear the system nav bar. The nav
-     * inset is always added on top so nothing hides behind the gesture/button bar.
+     * Reserves the right bottom space for the current step:
+     *  • Steps 1–3 show the floating Next button → pager *padding* keeps content clear
+     *    of it (the button floats over the pager, so padding, not margin, is right).
+     *  • The entry screen keeps the floating capsule nav visible → a pager *bottom
+     *    margin* shrinks the page to end at the capsule's top, so the card centres in
+     *    the band between the top bar and the capsule (no runtime measuring).
+     *  • The signing step is full-height (its own scroll padding clears the Build btn).
+     * The system gesture/nav-bar inset is always folded into the margin so no page
+     * ever runs under the navigation bar.
      */
     private fun applyPagerBottomPadding(step: Int) {
-        val base = when (step) {
+        val nextClearance = when (step) {
             STEP_WEBSITE, STEP_FEATURES, STEP_PERMISSIONS ->
                 (NEXT_CLEARANCE_DP * resources.displayMetrics.density).toInt()
             else -> 0
         }
-        binding.wizardPager.setPadding(0, 0, 0, base + systemBottomInset)
+        binding.wizardPager.setPadding(0, 0, 0, nextClearance)
+
+        val capsule = if (step == PAGE_ENTRY)
+            resources.getDimensionPixelSize(R.dimen.entry_capsule_clearance) else 0
+        val target = capsule + systemBottomInset
+        val lp = binding.wizardPager.layoutParams as ViewGroup.MarginLayoutParams
+        if (lp.bottomMargin != target) {
+            lp.bottomMargin = target
+            binding.wizardPager.layoutParams = lp
+        }
     }
 
     private fun setupTopBar() {

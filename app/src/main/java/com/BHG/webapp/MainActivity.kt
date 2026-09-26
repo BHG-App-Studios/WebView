@@ -139,7 +139,9 @@ class MainActivity : AppCompatActivity() {
             val lp = binding.bottomNav.navCapsule.layoutParams as ViewGroup.MarginLayoutParams
             lp.bottomMargin = navPillMargin + systemBars.bottom
             binding.bottomNav.navCapsule.layoutParams = lp
-            WindowInsetsCompat.CONSUMED
+            // Don't consume: the wizard pager reads the same inset to reserve the
+            // gesture/nav-bar area under its content.
+            insets
         }
     }
 

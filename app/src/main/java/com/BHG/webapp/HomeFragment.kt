@@ -2,6 +2,7 @@ package com.BHG.webapp
 
 import android.animation.ValueAnimator
 import android.content.Context
+import android.graphics.Bitmap
 import android.graphics.BitmapFactory
 import android.net.ConnectivityManager
 import android.net.NetworkCapabilities
@@ -32,6 +33,7 @@ import com.google.firebase.auth.FirebaseUser
 import com.google.firebase.firestore.FieldValue
 import com.google.firebase.firestore.FirebaseFirestore
 import org.json.JSONObject
+import java.io.ByteArrayOutputStream
 import java.io.File
 
 /**
@@ -959,7 +961,34 @@ class HomeFragment : Fragment() {
                 json.put("icon_zip_b64", Base64.encodeToString(bytes, Base64.NO_WRAP))
             }
         }
+
+        // Preview image: the same launcher icon as a single small WebP, sent the
+        // same way as the ZIP above. The Worker stores it beside that ZIP and links
+        // it from the build doc as `previewImage`, so a finished build can be shown
+        // without downloading it. Optional and best-effort: a logo with no preview
+        // stored yet simply leaves the field off the request.
+        previewWebpBase64(logoPreviewPath)?.let { json.put("preview_image_b64", it) }
         return json
+    }
+
+    /**
+     * [path]'s image re-encoded as a base64 WebP, or null when there is no file
+     * or it cannot be read.
+     *
+     * WebP rather than the PNG [LogoStore] keeps on disk: it holds on to the
+     * icon's transparency at a fraction of the size, which matters because these
+     * bytes ride in the build request body. Quality 100 makes it lossless, so the
+     * preview is the icon exactly as generated.
+     */
+    private fun previewWebpBase64(path: String?): String? {
+        if (path == null) return null
+        return runCatching {
+            val bitmap = BitmapFactory.decodeFile(path) ?: return null
+            val out = ByteArrayOutputStream()
+            @Suppress("DEPRECATION")   // WEBP at quality 100 is lossless
+            bitmap.compress(Bitmap.CompressFormat.WEBP, 100, out)
+            Base64.encodeToString(out.toByteArray(), Base64.NO_WRAP)
+        }.getOrNull()
     }
 
     // =========================================================================

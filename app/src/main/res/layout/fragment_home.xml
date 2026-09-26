@@ -82,12 +82,14 @@
         android:layout_height="0dp"
         android:layout_weight="1">
 
-        <!-- ── ViewPager2 (3 wizard steps) ─────────────────────────────── -->
+        <!-- ── ViewPager2 (wizard steps) ───────────────────────────────── -->
+        <!-- Bottom padding is set per-step in code: steps with the floating Next
+             button reserve room for it; the entry & signing steps only clear the
+             system navigation bar (no floating button there). -->
         <androidx.viewpager2.widget.ViewPager2
             android:id="@+id/wizardPager"
             android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:paddingBottom="88dp"
             android:clipToPadding="false" />
 
     <!-- ── Floating Next button (bottom-right) ──────────────────────── -->

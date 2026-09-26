@@ -19,6 +19,8 @@ import android.widget.Toast
 import androidx.activity.OnBackPressedCallback
 import androidx.activity.result.ActivityResultLauncher
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.core.view.ViewCompat
+import androidx.core.view.WindowInsetsCompat
 import androidx.fragment.app.Fragment
 import androidx.recyclerview.widget.RecyclerView
 import androidx.viewpager2.widget.ViewPager2
@@ -144,6 +146,12 @@ class HomeFragment : Fragment() {
     private val STEP_SIGNING     = 4  // Step 4: build type / signing + build
     private val TOTAL_STEPS      = 5
 
+    // Height (dp) the floating Next button needs cleared beneath steps 1–3.
+    private val NEXT_CLEARANCE_DP = 88
+
+    // Latest system navigation-bar inset, applied to the pager's bottom padding.
+    private var systemBottomInset = 0
+
     // =========================================================================
     //  Lifecycle
     // =========================================================================
@@ -237,8 +245,35 @@ class HomeFragment : Fragment() {
                 updateTopBarForStep(position)
                 updateNextButtonForStep(position)
                 updateNavForStep(position)
+                applyPagerBottomPadding(position)
             }
         })
+
+        // The wizard hides the capsule nav on the numbered steps, so the pager
+        // extends to the screen edge. Track the system navigation-bar inset and
+        // re-pad the current step whenever it changes so content never sits under
+        // the nav bar — and the entry/signing steps get no leftover void.
+        ViewCompat.setOnApplyWindowInsetsListener(binding.wizardPager) { _, insets ->
+            systemBottomInset = insets.getInsets(WindowInsetsCompat.Type.systemBars()).bottom
+            applyPagerBottomPadding(binding.wizardPager.currentItem)
+            insets
+        }
+        applyPagerBottomPadding(binding.wizardPager.currentItem)
+    }
+
+    /**
+     * Bottom padding for the pager depends on the step. Steps 1–3 show the floating
+     * Next button, so they reserve [NEXT_CLEARANCE_DP] for it; the entry and signing
+     * steps have no floating button, so they only clear the system nav bar. The nav
+     * inset is always added on top so nothing hides behind the gesture/button bar.
+     */
+    private fun applyPagerBottomPadding(step: Int) {
+        val base = when (step) {
+            STEP_WEBSITE, STEP_FEATURES, STEP_PERMISSIONS ->
+                (NEXT_CLEARANCE_DP * resources.displayMetrics.density).toInt()
+            else -> 0
+        }
+        binding.wizardPager.setPadding(0, 0, 0, base + systemBottomInset)
     }
 
     private fun setupTopBar() {
